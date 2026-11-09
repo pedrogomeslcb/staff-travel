@@ -10,15 +10,7 @@ create table if not exists public.staff_signup_settings (
 alter table public.staff_signup_settings enable row level security;
 revoke all on table public.staff_signup_settings from public, anon, authenticated;
 
--- Replace this placeholder with a SECRET team access code before running.
-do $$
-begin
-  if 'TROQUE_POR_UM_CODIGO_DA_EQUIPE' = 'TROQUE_POR_UM_CODIGO_DA_EQUIPE' then
-    raise notice 'Remember to replace the team access code placeholder in the INSERT statement below.';
-  end if;
-end;
-$$;
-
+-- Replace the quoted team access code in the INSERT statement below.
 insert into public.staff_signup_settings (id, access_code_sha256)
 values (
   1,
