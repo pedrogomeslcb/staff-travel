@@ -68,7 +68,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div><h2 className="font-semibold text-slate-900">{label}</h2>
           {section==='memberships'&&<p className="mt-1 text-xs text-slate-600">{linked
-            ?'Each IHG membership number is linked to a username, independently of the staff code. Edit a user below to set or remove their number.'
+            ?'Each IHG membership number is linked directly to a username. Edit a user below to set or remove their number.'
             :'New staff are added when they provide a membership number in a hotel request.'}</p>}
           {section==='flights'&&<p className="mt-1 text-xs text-slate-600">Flight references for hotel requests. Times use the airport’s local time.</p>}
         </div>
