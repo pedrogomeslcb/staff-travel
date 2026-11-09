@@ -79,8 +79,9 @@ Deno.serve(async request=>{
       return reply(200,{ok:true});
     }
     if(action==='set_role'){
-      if(!isPrimary)return reply(403,{error:'Only the primary admin can change roles.'});
-      if(targetId===user.id)return reply(403,{error:'You cannot change your own primary admin role.'});
+      // All admins may promote or demote other accounts; nobody may alter
+      // the primary admin or their own role. Access is checked server-side.
+      if(targetId===user.id)return reply(403,{error:'You cannot change your own role.'});
       if(!['admin','user'].includes(body.role))return reply(400,{error:'Invalid role.'});
       const {error}=await admin.from('staff_profiles')
         .update({role:body.role}).eq('user_id',targetId);
