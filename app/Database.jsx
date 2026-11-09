@@ -13,6 +13,7 @@ const fields={
     ['destination','Arrival airport'],['arrival','Arrival time'],
   ],
   memberships:[['name','Staff'],['membership','Membership number']],
+  membershipsLinked:[['username','Username'],['name','Full name'],['membership','IHG membership number']],
   drivers:[['name','Driver'],['licensePlate','License plate'],['contact','Contact']],
 };
 const outline='rounded-lg border px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50';
@@ -20,6 +21,7 @@ const input='mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate
 
 export default function Database({database,shared,trips,onReferences,children}) {
   const [section,setSection]=useState('flights'),[catalog,setCatalog]=useState(null);
+  const linked=database.linkedMemberships===true;
   const visibleSections=children?sections:sections.filter(([key])=>key!=='access');
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
   const [editor,setEditor]=useState(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
@@ -38,7 +40,8 @@ export default function Database({database,shared,trips,onReferences,children}) 
     return ()=>{active=false;};
   },[database,shared,trips,reload,onReferences]);
   function open(row=null) {
-    const draft=Object.fromEntries(fields[section].map(([key])=>[key,row?.[key]??'']));
+    const activeFields=section==='memberships'&&linked?fields.membershipsLinked:fields[section];
+    const draft=Object.fromEntries(activeFields.map(([key])=>[key,row?.[key]??'']));
     setEditor({id:row?.id??null,draft,revision:catalog.revision});
     setSaveError('');
   }
@@ -53,7 +56,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
     finally {setSaving(false);}
   }
   const label=sections.find(([value])=>value===section)[1];
-  const columns=fields[section]??[];
+  const columns=(section==='memberships'&&linked?fields.membershipsLinked:fields[section])??[];
   const rows=[...(catalog?.[section]??[])].sort((a,b)=>String(a[columns[0]?.[0]]).localeCompare(String(b[columns[0]?.[0]]),'en-US',{numeric:true,sensitivity:'base'}));
   return <div className="space-y-4">
     <nav aria-label="Database sections" className="flex flex-wrap gap-2">
@@ -64,12 +67,15 @@ export default function Database({database,shared,trips,onReferences,children}) 
     {section==='access'?children:<section className="overflow-hidden rounded-xl border bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div><h2 className="font-semibold text-slate-900">{label}</h2>
-          {section==='memberships'&&<p className="mt-1 text-xs text-slate-600">New staff are added when they provide a membership number in a hotel request.</p>}
+          {section==='memberships'&&<p className="mt-1 text-xs text-slate-600">{linked
+            ?'Each IHG membership number is linked to a username, independently of the staff code. Edit a user below to set or remove their number.'
+            :'New staff are added when they provide a membership number in a hotel request.'}</p>}
           {section==='flights'&&<p className="mt-1 text-xs text-slate-600">Flight references for hotel requests. Times use the airport’s local time.</p>}
         </div>
         <div className="flex gap-2">
           <button type="button" className={outline} disabled={loading} onClick={()=>setReload(value=>value+1)}>Refresh</button>
-          {<button type="button" className={outline} disabled={!catalog||loading||!!loadError} onClick={()=>open()}>Add entry</button>}
+          {!(linked&&section==='memberships')&&<button type="button" className={outline}
+            disabled={!catalog||loading||!!loadError} onClick={()=>open()}>Add entry</button>}
         </div>
       </div>
       {loading&&<p role="status" className="px-4 pb-4 text-sm text-slate-600">Loading database…</p>}
@@ -82,18 +88,27 @@ export default function Database({database,shared,trips,onReferences,children}) 
         </tr></thead>
         <tbody className="divide-y">{rows.map(row=><tr key={row.id}>
           {columns.map(([key],index)=>index===0?<th scope="row" className="whitespace-nowrap px-4 py-2 font-medium" key={key}>{row[key]}</th>
-            :<td className="whitespace-nowrap px-4 py-2 text-slate-700" key={key}>{row[key]}</td>)}
+            :<td className="whitespace-nowrap px-4 py-2 text-slate-700" key={key}>{row[key]||(linked&&section==='memberships'&&key==='membership'?'Not linked':'')}</td>)}
           {section==='drivers'&&<td className="px-4 py-2">{row.capacity}</td>}
           <td className="px-4 py-2"><button type="button" className="rounded px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
             aria-label={'Edit '+row[columns[0][0]]} disabled={loading||!!loadError} onClick={()=>open(row)}>Edit</button></td>
         </tr>)}</tbody>
-      </table>{!rows.length&&!loading&&<p className="p-4 text-sm text-slate-600">No entries yet.</p>}</div>}
+      </table>{!rows.length&&!loading&&<p className="p-4 text-sm text-slate-600">No entries yet.</p>}
+      {linked&&section==='memberships'&&!!catalog.legacyMemberships?.length&&<div className="border-t bg-slate-50 p-4">
+        <p className="text-xs font-medium text-slate-700">Legacy IHG records not yet linked to usernames</p>
+        <p className="my-2 text-xs text-slate-500">These original records are preserved. To link one, select Edit for its registered username above and enter its IHG number.</p>
+        <div className="flex flex-wrap gap-2">{catalog.legacyMemberships.map(x=><span key={x.staff_code}
+          className="rounded-lg border bg-white px-3 py-2 text-xs text-slate-700">{x.staff_code}: {x.membership}</span>)}</div>
+      </div>}
+      </div>}
     </section>}
     {editor&&<Dialog title={editor.id?'Edit database entry':'Add database entry'} onClose={()=>{if(!saving)setEditor(null);}} wide>
       <form onSubmit={save} className="space-y-4 p-5">
         <div className="grid gap-3 sm:grid-cols-2">
           {columns.map(([key,text])=><label key={key} className="text-xs text-slate-600">{text}
-            <input className={input} required maxLength={key==='membership'?64:120}
+            <input className={input} required={!(linked&&section==='memberships'&&key==='membership')}
+              readOnly={linked&&section==='memberships'&&key!=='membership'}
+              maxLength={key==='membership'?64:120}
               placeholder={key==='departure'||key==='arrival'?'HH:MM':undefined}
               value={editor.draft[key]} onChange={event=>setEditor(previous=>({...previous,draft:{...previous.draft,[key]:event.target.value}}))}/>
           </label>)}
