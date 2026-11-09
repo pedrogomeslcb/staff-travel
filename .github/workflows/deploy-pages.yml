@@ -12,6 +12,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
