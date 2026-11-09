@@ -272,7 +272,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
 
     {tab==='transport'&&<Transfers trips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} user={user} busy={busy} onSave={saveTransfer} onAllocate={saveDrivers}/>}
 
-    {tab==='planner'&&<Schedule month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={changes=>saveSchedule(()=>changes)} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
+    {tab==='planner'&&<Schedule month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={changes=>saveSchedule(()=>changes)} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
     {tab==='access'&&user.role==='admin'&&(database?<Database database={database} shared={shared||connected} trips={trips} onReferences={setReferences}>{usersAccess}</Database>:usersAccess)}
     {tab==='audit'&&!connected&&user.role==='admin'&&<TravelAudit repo={repo} user={user} trips={trips} shared={shared}/>}
   </main>
