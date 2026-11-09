@@ -20,6 +20,7 @@ const input='mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate
 
 export default function Database({database,shared,trips,onReferences,children}) {
   const [section,setSection]=useState('flights'),[catalog,setCatalog]=useState(null);
+  const visibleSections=children?sections:sections.filter(([key])=>key!=='access');
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
   const [editor,setEditor]=useState(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
   useEffect(()=>{
@@ -29,7 +30,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
       try {
         if(!shared)await database.capture(trips);
         const data=await database.read();
-        if(active){setCatalog(data);onReferences(catalogReferences(data));}
+        if(active){setCatalog(data);onReferences(await database.references());}
       }catch(error){if(active){setCatalog(null);setLoadError(error.message);}}
       finally {if(active)setLoading(false);}
     }
@@ -47,7 +48,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
     setSaving(true);setSaveError('');
     try {
       const next=await database.save(section,editor.id,editor.draft,editor.revision);
-      setCatalog(next);onReferences(catalogReferences(next));setEditor(null);
+      setCatalog(next);onReferences(await database.references());setEditor(null);
     }catch(error){setSaveError(error.message);}
     finally {setSaving(false);}
   }
@@ -56,7 +57,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
   const rows=[...(catalog?.[section]??[])].sort((a,b)=>String(a[columns[0]?.[0]]).localeCompare(String(b[columns[0]?.[0]]),'en-US',{numeric:true,sensitivity:'base'}));
   return <div className="space-y-4">
     <nav aria-label="Database sections" className="flex flex-wrap gap-2">
-      {sections.map(([value,text])=><button type="button" key={value} aria-current={section===value?'page':undefined}
+      {visibleSections.map(([value,text])=><button type="button" key={value} aria-current={section===value?'page':undefined}
         className={'rounded-lg px-3 py-2 text-sm '+(section===value?'bg-slate-200 font-medium text-slate-900':'text-slate-600 hover:bg-slate-100')}
         onClick={()=>setSection(value)}>{text}</button>)}
     </nav>
@@ -68,7 +69,7 @@ export default function Database({database,shared,trips,onReferences,children}) 
         </div>
         <div className="flex gap-2">
           <button type="button" className={outline} disabled={loading} onClick={()=>setReload(value=>value+1)}>Refresh</button>
-          {section!=='drivers'&&<button type="button" className={outline} disabled={!catalog||loading||!!loadError} onClick={()=>open()}>Add entry</button>}
+          {<button type="button" className={outline} disabled={!catalog||loading||!!loadError} onClick={()=>open()}>Add entry</button>}
         </div>
       </div>
       {loading&&<p role="status" className="px-4 pb-4 text-sm text-slate-600">Loading database…</p>}
