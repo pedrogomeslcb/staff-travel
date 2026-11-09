@@ -35,7 +35,7 @@ export default function SupabaseGate() {
     const {data:{user},error:authError}=await supabase.auth.getUser();
     if(authError||!user){setIdentity(null);return;}
     const {data:profile,error:profileError}=await supabase.from('staff_profiles')
-      .select('role,staff_code,display_name,is_primary_admin,username').eq('user_id',user.id).maybeSingle();
+      .select('role,display_name,is_primary_admin,username').eq('user_id',user.id).maybeSingle();
     if(profileError){setIdentity(null);setError('Could not check account permissions: '+profileError.message);return;}
     if(!profile||!['admin','user'].includes(profile.role)){
       setIdentity(null);
@@ -45,9 +45,8 @@ export default function SupabaseGate() {
     setError('');
     setIdentity({
       id:user.id,
-      name:profile.display_name||profile.staff_code||user.email?.split('@')[0]||'Staff',
+      name:profile.display_name||profile.username||user.email?.split('@')[0]||'Staff',
       role:profile.role,
-      staffCode:profile.staff_code||null,
       isPrimaryAdmin:profile.is_primary_admin===true,
       username:profile.username||null,
     });
@@ -116,7 +115,7 @@ export default function SupabaseGate() {
     as GitHub Actions repository variables, then rerun the publish workflow.
   </div>;
   if(identity===undefined)return <div className="p-8 text-center text-sm">Checking account permissions…</div>;
-  if(identity)return <StaffPlanner key={identity.id+'-'+identity.role+'-'+identity.staffCode+'-'+identity.isPrimaryAdmin+'-'+identity.name} mode="supabase"
+  if(identity)return <StaffPlanner key={identity.id+'-'+identity.role+'-'+identity.isPrimaryAdmin+'-'+identity.name} mode="supabase"
     initialUser={identity} loginName={identity.name} supabaseClient={supabase} onSupabaseSignOut={signOut}/>;
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5">
     <div className="w-full max-w-md space-y-4 rounded-2xl border bg-white p-7 shadow-sm">
