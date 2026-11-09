@@ -73,7 +73,7 @@ function TimeField({label,value,onChange}) {
 export default function StaffPlanner({mode='demo',initialUser=null,loginName='',staticDemo=false,supabaseClient=null,onSupabaseSignOut=null}) {
   const shared=mode==='shared';
   const connected=mode==='supabase'&&!!supabaseClient;
-  const repo=useMemo(()=>shared?remoteRepository():localRepository({getItem:k=>window.localStorage.getItem(k),setItem:(k,v)=>window.localStorage.setItem(k,v)}),[shared]);
+  const repo=useMemo(()=>shared?remoteRepository():localRepository({getItem:k=>window.localStorage.getItem(connected?('staff_travel_user_'+initialUser.id+'_'+k):k),setItem:(k,v)=>window.localStorage.setItem(connected?('staff_travel_user_'+initialUser.id+'_'+k):k,v)}),[shared,connected,initialUser?.id]);
   const database=useMemo(()=>connected?supabaseDatabaseClient(supabaseClient):(staticDemo?null:databaseClient()),[connected,supabaseClient,staticDemo]);
   const [name,setName]=useState(loginName),[password,setPassword]=useState(''),[user,setUser]=useState(initialUser);
   const [people,setPeople]=useState([]),[trips,setTrips]=useState([]),[schedule,setSchedule]=useState({});
