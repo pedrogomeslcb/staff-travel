@@ -50,7 +50,10 @@ Deno.serve(async request=>{
       .select('user_id,role,is_primary_admin,display_name,username,staff_code')
       .eq('user_id',targetId).maybeSingle();
     if(targetError||!target)return reply(404,{error:'User account not found.'});
-    if(target.is_primary_admin)return reply(403,{error:'The primary admin account is protected.'});
+    // Department is a descriptive tag, not a permission. It may also be set
+    // for the primary administrator; sensitive account actions remain blocked.
+    if(target.is_primary_admin && action!=='set_department')
+      return reply(403,{error:'The primary admin account is protected.'});
 
     if(action==='delete_user'){
       if(targetId===user.id)return reply(403,{error:'You cannot delete your own account.'});
@@ -67,6 +70,16 @@ Deno.serve(async request=>{
       if(typeof password!=='string'||password.length<6||password.length>128)
         return reply(400,{error:'Password must contain 6–128 characters.'});
       const {error}=await admin.auth.admin.updateUserById(targetId,{password});
+      if(error)throw error;
+      return reply(200,{ok:true});
+    }
+    if(action==='set_department'){
+      const value=body.department;
+      const department=value===''||value===null?null:value;
+      if(department!==null && !['TMO','Cost Excellence','Revenue Enhancement'].includes(department))
+        return reply(400,{error:'Choose a valid department.'});
+      const {error}=await admin.from('staff_profiles')
+        .update({department}).eq('user_id',targetId);
       if(error)throw error;
       return reply(200,{ok:true});
     }
