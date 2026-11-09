@@ -35,14 +35,20 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     if(!editor)return;
     if(editor.action==='delete'&&!window.confirm('Permanently delete '+(editor.person.display_name||editor.person.username)+'? This cannot be undone.'))return;
     setBusy(true);setError('');
-    const {data,error:fnError}=await client.functions.invoke('staff-admin-users',{
+    let data,fnError;
+    try {
+      ({data,error:fnError}=await client.functions.invoke('staff-admin-users',{
       body:{action:editor.action==='code'?'set_staff_code':editor.action==='role'?'set_role':
         editor.action==='password'?'reset_password':'delete_user',
         userId:editor.person.user_id,
         ...(editor.action==='code'?{staffCode:draft}:{}),
         ...(editor.action==='role'?{role:draft}:{}),
         ...(editor.action==='password'?{password:draft}:{})},
-    });
+      }));
+    }catch(err){
+      setError(err.message||'Could not reach the admin service.');
+      setBusy(false);return;
+    }
     try {
       if(fnError){
         // Supabase exposes detailed error messages in the function response body.
