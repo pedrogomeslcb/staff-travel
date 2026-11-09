@@ -4,6 +4,12 @@ import Dialog from './Dialog';
 const input='mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm';
 const button='rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-blue-800 hover:bg-slate-50 disabled:opacity-40';
 const personName=person=>person.display_name||person.username||'Staff';
+const departments=['TMO','Cost Excellence','Revenue Enhancement'];
+const departmentColor={
+  TMO:'bg-slate-100 text-slate-700',
+  'Cost Excellence':'bg-sky-50 text-sky-800',
+  'Revenue Enhancement':'bg-teal-50 text-teal-800',
+};
 
 export default function SupabaseUsersAccess({client,currentUser,onChange}){
   const [users,setUsers]=useState([]);
@@ -19,7 +25,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     try {
       const [profiles,memberships]=await Promise.all([
         client.from('staff_profiles')
-          .select('user_id,username,display_name,role,is_primary_admin')
+          .select('user_id,username,display_name,role,is_primary_admin,department')
           .order('display_name',{ascending:true}),
         client.from('staff_ihg_memberships').select('user_id,membership'),
       ]);
@@ -43,6 +49,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     setEditor({
       person,
       ihgMembership:person.ihgMembership||'',
+      department:person.department||'',
       role:person.role,
       newPassword:'',
     });
@@ -86,6 +93,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     const ihgMembership=editor.ihgMembership.trim();
     const newPassword=editor.newPassword;
     const ihgChanged=ihgMembership!==(person.ihgMembership||'');
+    const departmentChanged=editor.department!==(person.department||'');
     const roleChanged=mayEditRole(person)&&editor.role!==person.role;
     const passwordChanged=mayResetPassword(person)&&newPassword.length>0;
 
@@ -97,7 +105,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
       setError('A new password must contain between 6 and 128 characters.');
       return;
     }
-    if(!ihgChanged&&!roleChanged&&!passwordChanged){
+    if(!ihgChanged&&!departmentChanged&&!roleChanged&&!passwordChanged){
       setNotice('No changes to save.');
       setEditor(null);
       return;
@@ -106,6 +114,10 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     setBusy(true);setError('');
     let completed=0;
     try {
+      if(departmentChanged){
+        await adminAction('set_department',person.user_id,{department:editor.department});
+        completed++;
+      }
       if(ihgChanged){
         const {error:membershipError}=ihgMembership
           ?await client.from('staff_ihg_memberships').upsert({
@@ -169,7 +181,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-50 text-xs text-slate-600"><tr>
-          {['Full name','Username','Role','IHG membership','Actions'].map(label=>
+          {['Full name','Username','Department','Role','IHG membership','Actions'].map(label=>
             <th key={label} className="whitespace-nowrap border-b px-4 py-3">{label}</th>)}
         </tr></thead>
         <tbody className="divide-y">{users.map(person=><tr key={person.user_id}>
@@ -178,6 +190,13 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
             {person.user_id===currentUser?.id&&<span className="ml-2 text-xs text-slate-400">(You)</span>}
           </th>
           <td className="px-4 py-3">{person.username||'—'}</td>
+          <td className="whitespace-nowrap px-4 py-3">
+            {person.department
+              ?<span className={'inline-flex rounded-md px-2.5 py-1 text-xs font-medium '+(departmentColor[person.department]||'bg-slate-100 text-slate-700')}>
+                {person.department}
+              </span>
+              :<span className="text-slate-400">Unassigned</span>}
+          </td>
           <td className="px-4 py-3">
             {person.role==='admin'?'Admin':'User'}
             {person.is_primary_admin&&<span className="ml-1 text-xs text-slate-500">(Primary)</span>}
@@ -209,6 +228,13 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
             <input className={input} maxLength={64} placeholder="Hotel loyalty number"
               value={editor.ihgMembership}
               onChange={e=>updateEditor('ihgMembership',e.target.value)}/>
+          </label>
+          <label className="block text-xs text-slate-600">Department
+            <select className={input} value={editor.department}
+              onChange={e=>updateEditor('department',e.target.value)}>
+              <option value="">Unassigned</option>
+              {departments.map(item=><option key={item} value={item}>{item}</option>)}
+            </select>
           </label>
           <label className="block text-xs text-slate-600">Role
             <select className={input+(!mayEditRole(editor.person)?' bg-slate-50':'')}
