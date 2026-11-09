@@ -75,6 +75,7 @@ export default function SupabaseGate() {
     setError('');setNotice('');
     const username=loginName.trim().toLowerCase();
     if(username.includes('@')){setError('Choose a username without @.');return;}
+    if(['admin','root','system','support'].includes(username)){setError('This username is reserved. Choose another.');return;}
     if(!/^[a-z0-9][a-z0-9._-]{1,31}$/.test(username)) {
       setError('Username must be 2–32 characters using letters, digits, dots, _ or -.');return;
     }
