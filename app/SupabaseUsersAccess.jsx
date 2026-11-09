@@ -3,7 +3,6 @@ import Dialog from './Dialog';
 
 const input='mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm';
 const button='rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-blue-800 hover:bg-slate-50 disabled:opacity-40';
-const normalizeCode=value=>String(value??'').trim().toUpperCase();
 const personName=person=>person.display_name||person.username||'Staff';
 
 export default function SupabaseUsersAccess({client,currentUser,onChange}){
@@ -20,7 +19,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     try {
       const [profiles,memberships]=await Promise.all([
         client.from('staff_profiles')
-          .select('user_id,username,display_name,staff_code,role,is_primary_admin')
+          .select('user_id,username,display_name,role,is_primary_admin')
           .order('display_name',{ascending:true}),
         client.from('staff_ihg_memberships').select('user_id,membership'),
       ]);
@@ -38,13 +37,11 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
   const protectedAccount=person=>person.is_primary_admin||person.user_id===currentUser?.id;
   const mayDelete=person=>!protectedAccount(person)&&(person.role==='user'||isPrimary);
   const mayEditRole=person=>!protectedAccount(person);
-  const mayEditCode=person=>!person.is_primary_admin;
   const mayResetPassword=person=>isPrimary&&!person.is_primary_admin;
 
   function open(person){
     setEditor({
       person,
-      staffCode:person.staff_code||'',
       ihgMembership:person.ihgMembership||'',
       role:person.role,
       newPassword:'',
@@ -86,23 +83,21 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     event.preventDefault();
     if(busy||!editor)return;
     const person=editor.person;
-    const staffCode=normalizeCode(editor.staffCode);
     const ihgMembership=editor.ihgMembership.trim();
     const newPassword=editor.newPassword;
-    const codeChanged=mayEditCode(person)&&staffCode!==normalizeCode(person.staff_code);
     const ihgChanged=ihgMembership!==(person.ihgMembership||'');
     const roleChanged=mayEditRole(person)&&editor.role!==person.role;
     const passwordChanged=mayResetPassword(person)&&newPassword.length>0;
 
-    if(staffCode.length>32||ihgMembership.length>64){
-      setError('Staff code may have at most 32 characters and IHG membership at most 64.');
+    if(ihgMembership.length>64){
+      setError('IHG membership may have at most 64 characters.');
       return;
     }
     if(passwordChanged&&(newPassword.length<6||newPassword.length>128)){
       setError('A new password must contain between 6 and 128 characters.');
       return;
     }
-    if(!codeChanged&&!ihgChanged&&!roleChanged&&!passwordChanged){
+    if(!ihgChanged&&!roleChanged&&!passwordChanged){
       setNotice('No changes to save.');
       setEditor(null);
       return;
@@ -111,10 +106,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     setBusy(true);setError('');
     let completed=0;
     try {
-      if(codeChanged){
-        await adminAction('set_staff_code',person.user_id,{staffCode});
-        completed++;
-      }
       if(ihgChanged){
         const {error:membershipError}=ihgMembership
           ?await client.from('staff_ihg_memberships').upsert({
@@ -178,7 +169,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-50 text-xs text-slate-600"><tr>
-          {['Full name','Username','Role','Staff code','IHG membership','Actions'].map(label=>
+          {['Full name','Username','Role','IHG membership','Actions'].map(label=>
             <th key={label} className="whitespace-nowrap border-b px-4 py-3">{label}</th>)}
         </tr></thead>
         <tbody className="divide-y">{users.map(person=><tr key={person.user_id}>
@@ -191,7 +182,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
             {person.role==='admin'?'Admin':'User'}
             {person.is_primary_admin&&<span className="ml-1 text-xs text-slate-500">(Primary)</span>}
           </td>
-          <td className="px-4 py-3">{person.staff_code||'—'}</td>
           <td className="px-4 py-3">{person.ihgMembership||'Not linked'}</td>
           <td className="px-4 py-3">
             <button type="button" className={button} disabled={busy}
@@ -202,7 +192,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
       {!users.length&&!loading&&<p className="p-4 text-sm text-slate-500">No accounts found.</p>}
     </div>
     <p className="px-4 py-3 text-xs text-slate-500">
-      Staff code and IHG membership are separate. Passwords cannot be viewed.
+      IHG membership is linked to each user's account. Passwords cannot be viewed.
       Deleting a user preserves their historical hotel requests.
     </p>
 
@@ -214,12 +204,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
           </label>
           <label className="block text-xs text-slate-600">Username
             <input className={input+' bg-slate-50'} readOnly value={editor.person.username||''}/>
-          </label>
-          <label className="block text-xs text-slate-600">Staff code
-            <input className={input+(!mayEditCode(editor.person)?' bg-slate-50':'')}
-              readOnly={!mayEditCode(editor.person)} maxLength={32}
-              placeholder="e.g. P/G" value={editor.staffCode}
-              onChange={e=>updateEditor('staffCode',e.target.value)}/>
           </label>
           <label className="block text-xs text-slate-600">IHG membership number
             <input className={input} maxLength={64} placeholder="Hotel loyalty number"
@@ -242,7 +226,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
           </label>}
         </div>
         {editor.person.is_primary_admin&&<p className="text-xs text-slate-500">
-          The primary admin account is protected: its role, staff code and access cannot be changed here.
+          The primary admin account is protected: its role and access cannot be changed here.
         </p>}
         {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex flex-wrap items-center gap-3 border-t pt-4">
