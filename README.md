@@ -2,6 +2,22 @@
 
 > The GitHub Pages application uses Supabase Auth and a server-authorized Database. Never add your Supabase service role or secret key to this public repository.
 
+## Department tags
+
+The staff admin table and the Edit user dialog now support three Department values:
+**TMO**, **Cost Excellence**, and **Revenue Enhancement** (or Unassigned).
+The selected department also appears as a color-coded tag on the Schedule and can be used to filter team members.
+
+To enable this in an existing project, complete **both** steps:
+1. Run [supabase/departments.sql](./supabase/departments.sql) in the Supabase SQL Editor.
+   This adds the validated `staff_profiles.department` column without changing existing users.
+2. Replace the deployed Edge Function `staff-admin-users` with the current version of
+   [supabase/functions/staff-admin-users/index.ts](./supabase/functions/staff-admin-users/index.ts)
+   using Supabase → Edge Functions → `staff-admin-users` → Editor → Deploy.
+
+The frontend alone cannot save departments until the Supabase migration and the Edge Function update are complete.
+All admins can assign departments. This does not change the user's User/Admin permissions.
+
 ## Activate shared hotels and administrator user management
 
 The frontend source has been published, but these two backend steps **must** be completed in the Supabase dashboard before the new features work.
