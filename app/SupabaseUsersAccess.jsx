@@ -6,9 +6,9 @@ const button='rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text
 const personName=person=>person.display_name||person.username||'Staff';
 const departments=['TMO','Cost Excellence','Revenue Enhancement'];
 const departmentColor={
-  TMO:'bg-slate-100 text-slate-700',
-  'Cost Excellence':'bg-sky-50 text-sky-800',
-  'Revenue Enhancement':'bg-teal-50 text-teal-800',
+  TMO:'bg-violet-50 text-violet-800 ring-1 ring-inset ring-violet-100',
+  'Cost Excellence':'bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-100',
+  'Revenue Enhancement':'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-100',
 };
 
 export default function SupabaseUsersAccess({client,currentUser,onChange}){
