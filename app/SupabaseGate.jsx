@@ -4,10 +4,24 @@ import StaffPlanner from './StaffPlanner';
 
 const input='w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm';
 const button='rounded-lg bg-blue-700 px-4 py-2.5 text-white disabled:opacity-50';
+const usernameDomain='users.staff-travel.example.com';
+
+// Supabase Auth natively signs in with an email or phone number, not a username.
+// Usernames are mapped to reserved-domain identifiers; colleagues never need an email inbox.
+function signInIdentifier(value) {
+  const identifier=value.trim().toLowerCase();
+  if(identifier.includes('@')) {
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier))throw new Error('Enter a valid administrator email.');
+    return identifier;
+  }
+  if(!/^[a-z0-9][a-z0-9._-]{1,31}$/.test(identifier))
+    throw new Error('Username must have 2–32 letters, numbers, dots, underscores or hyphens.');
+  return identifier+'@'+usernameDomain;
+}
 
 export default function SupabaseGate() {
   const [identity,setIdentity]=useState(undefined);
-  const [email,setEmail]=useState('');
+  const [loginName,setLoginName]=useState('');
   const [password,setPassword]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
@@ -36,18 +50,20 @@ export default function SupabaseGate() {
     let active=true;
     const refresh=()=>{if(active)void loadIdentity().catch(err=>{if(active){setIdentity(null);setError(err.message);}});};
     refresh();
-    const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>{refresh();});
+    const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>{setTimeout(refresh,0);});
     window.addEventListener('focus',refresh);
     return ()=>{active=false;subscription.unsubscribe();window.removeEventListener('focus',refresh);};
   },[loadIdentity]);
   async function login(event){
     event.preventDefault();
     setBusy(true);setError('');
-    const {error:loginError}=await supabase.auth.signInWithPassword({email:email.trim(),password});
-    setPassword('');
-    if(loginError)setError(loginError.message);
-    else await loadIdentity().catch(err=>setError(err.message));
-    setBusy(false);
+    try {
+      const email=signInIdentifier(loginName);
+      const {error:loginError}=await supabase.auth.signInWithPassword({email,password});
+      if(loginError)setError(loginError.message);
+      else await loadIdentity();
+    }catch(err){setError(err.message);}
+    finally {setPassword('');setBusy(false);}
   }
   async function signOut(){
     setBusy(true);
@@ -66,10 +82,11 @@ export default function SupabaseGate() {
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5">
     <div className="w-full max-w-md space-y-4 rounded-2xl border bg-white p-7 shadow-sm">
       <h1 className="text-2xl font-semibold text-blue-900">Staff & Travel</h1>
-      <p className="text-sm text-slate-600">Sign in using your Supabase account. The old admin / test login is not valid here.</p>
+      <p className="text-sm text-slate-600">Team members and administrators use a username and password. The primary administrator may also sign in with their email. The old admin / test login is disabled.</p>
       <form onSubmit={login} className="space-y-4">
-        <label className="block text-sm">Email<input type="email" required autoComplete="username" className={input+' mt-1'}
-          value={email} onChange={e=>setEmail(e.target.value)}/></label>
+        <label className="block text-sm">Username (or primary admin email)<input type="text" required autoComplete="username"
+          placeholder="e.g. pg" className={input+' mt-1'}
+          value={loginName} onChange={e=>setLoginName(e.target.value)}/></label>
         <label className="block text-sm">Password<input type="password" required autoComplete="current-password"
           className={input+' mt-1'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
         <button className={button+' w-full'} disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
