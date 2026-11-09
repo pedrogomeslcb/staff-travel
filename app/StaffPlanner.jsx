@@ -163,7 +163,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     e.preventDefault();await mutate(async()=>{
       const result=await repo.save(user,trip,editing);acceptRecord(result.record);setModal(false);
       if(!shared&&!connected&&result.record.membership)void database?.capture([result.record]).catch(()=>{});
-      setMessage(!result.changed?'No changes to save.':editing!==null?(shared||connected?'Request updated for the team.':'Request updated locally. No email was sent.'):(shared||connected?'Request saved for the team. No email was sent.':'Request saved locally. No email was sent.'));await refreshSaved();
+      setMessage(!result.changed?'No changes to save.':editing!==null?(shared||connected?'Request updated for the team.':'Request updated locally. No email was sent.'):(shared||connected?'':'Request saved locally. No email was sent.'));await refreshSaved();
     });
   }
   async function confirm(t) {await mutate(async()=>{const record=await repo.confirm(user,t,drafts[t.id]??t.confirmationNumber??'');acceptRecord(record);setDrafts(p=>{const n={...p};delete n[t.id];return n;});setMessage(shared?'Hotel confirmation saved.':'Hotel confirmation saved locally.');await refreshSaved();});}
