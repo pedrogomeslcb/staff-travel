@@ -13,7 +13,8 @@
     "@noble/hashes": "^2.4.0",
     "radix-ui": "^1.6.7",
     "clsx": "2.1.1",
-    "tailwind-merge": "3.6.0"
+    "tailwind-merge": "3.6.0",
+    "@supabase/supabase-js": "^2.57.0"
   },
   "devDependencies": {
     "vite": "8.0.13",
