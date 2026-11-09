@@ -16,18 +16,25 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
   const refresh=useCallback(async()=>{
     setLoading(true);setError('');
     try {
-      const {data,error:queryError}=await client.from('staff_profiles')
-        .select('user_id,username,display_name,staff_code,role,is_primary_admin')
-        .order('display_name',{ascending:true});
-      if(queryError)throw queryError;
-      setUsers(data||[]);
+      const [profiles,memberships]=await Promise.all([
+        client.from('staff_profiles')
+          .select('user_id,username,display_name,staff_code,role,is_primary_admin')
+          .order('display_name',{ascending:true}),
+        client.from('staff_ihg_memberships').select('user_id,membership'),
+      ]);
+      if(profiles.error)throw profiles.error;
+      if(memberships.error)throw memberships.error;
+      const byUser=new Map((memberships.data||[]).map(row=>[row.user_id,row.membership]));
+      setUsers((profiles.data||[]).map(person=>({
+        ...person,ihgMembership:byUser.get(person.user_id)||'',
+      })));
     }catch(err){setError(err.message||'Could not load users.');}
     finally{setLoading(false);}
   },[client]);
   useEffect(()=>{void refresh();},[refresh]);
   function open(action,person){
     setEditor({action,person});
-    setDraft(action==='code'?person.staff_code||'':action==='role'?person.role:'');
+    setDraft(action==='code'?person.staff_code||'':action==='ihg'?person.ihgMembership||'':action==='role'?person.role:'');
     setError('');setNotice('');
   }
   async function perform(event){
@@ -35,6 +42,23 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     if(!editor)return;
     if(editor.action==='delete'&&!window.confirm('Permanently delete '+(editor.person.display_name||editor.person.username)+'? This cannot be undone.'))return;
     setBusy(true);setError('');
+    if(editor.action==='ihg'){
+      try {
+        const membership=draft.trim();
+        if(membership.length>64)throw new Error('IHG membership is too long.');
+        const response=membership
+          ?await client.from('staff_ihg_memberships').upsert({
+            user_id:editor.person.user_id,membership,updated_at:new Date().toISOString(),
+          })
+          :await client.from('staff_ihg_memberships').delete().eq('user_id',editor.person.user_id);
+        if(response.error)throw response.error;
+        setEditor(null);setDraft('');setNotice('IHG membership updated.');
+        await refresh();
+        if(onChange)await onChange();
+      }catch(err){setError(err.message||'Could not update IHG membership.');}
+      finally{setBusy(false);}
+      return;
+    }
     let data,fnError;
     try {
       ({data,error:fnError}=await client.functions.invoke('staff-admin-users',{
@@ -77,7 +101,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     {notice&&<p role="status" className="p-4 text-sm text-green-800">{notice}</p>}
     <div className="overflow-x-auto"><table className="w-full text-left text-sm">
       <thead className="bg-slate-50 text-xs text-slate-600"><tr>
-        {['Full name','Username','Role','Staff code / IHG','Actions'].map(label=>
+        {['Full name','Username','Role','Staff code','IHG membership','Actions'].map(label=>
           <th key={label} className="whitespace-nowrap border-b px-4 py-3">{label}</th>)}
       </tr></thead>
       <tbody className="divide-y">{users.map(person=><tr key={person.user_id}>
@@ -86,10 +110,13 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
         <td className="px-4 py-3">{person.username||'—'}</td>
         <td className="px-4 py-3">{person.role==='admin'?'Admin':'User'}
           {person.is_primary_admin&&<span className="ml-1 text-xs text-slate-500">(Primary)</span>}</td>
-        <td className="px-4 py-3">{person.staff_code||'Not linked'}</td>
+        <td className="px-4 py-3">{person.staff_code||'—'}</td>
+        <td className="px-4 py-3">{person.ihgMembership||'Not linked'}</td>
         <td className="px-4 py-3"><div className="flex flex-wrap gap-2">
           {!person.is_primary_admin&&<button className={button} disabled={busy}
             onClick={()=>open('code',person)}>Edit staff code</button>}
+          <button className={button} disabled={busy}
+            onClick={()=>open('ihg',person)}>Edit IHG</button>
           {!protectedAccount(person)&&<button className={button} disabled={busy}
             onClick={()=>open('role',person)}>Edit role</button>}
           {isPrimary&&!person.is_primary_admin&&<button className={button} disabled={busy}
@@ -100,14 +127,18 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
       </tr>)}</tbody>
     </table>{!users.length&&!loading&&<p className="p-4 text-sm text-slate-500">No accounts found.</p>}</div>
     <p className="px-4 py-3 text-xs text-slate-500">Passwords are never displayed or stored in this interface.
-      The assigned staff code must match the IHG table. Deleting an account does not delete historical hotel requests.</p>
+      IHG membership is linked directly to the username, separately from the staff code. Deleting an account does not delete historical hotel requests.</p>
     {editor&&<Dialog title={editor.action==='password'?'Reset password':
-      editor.action==='delete'?'Delete user':editor.action==='role'?'Change role':'Link staff code'}
+      editor.action==='delete'?'Delete user':editor.action==='role'?'Change role':editor.action==='ihg'?'Edit IHG membership':'Edit staff code'}
       onClose={()=>!busy&&setEditor(null)}>
       <form onSubmit={perform} className="space-y-4 p-5">
         <p className="text-sm">{editor.person.display_name||editor.person.username}</p>
         {editor.action==='code'&&<label className="block text-xs">Staff code (e.g. A/B)
           <input className={input} maxLength={32} value={draft} onChange={e=>setDraft(e.target.value)}/>
+        </label>}
+        {editor.action==='ihg'&&<label className="block text-xs">IHG membership number (leave blank to remove)
+          <input className={input} maxLength={64} value={draft}
+            onChange={e=>setDraft(e.target.value)} placeholder="Hotel loyalty number"/>
         </label>}
         {editor.action==='role'&&<label className="block text-xs">Role
           <select className={input} value={draft} onChange={e=>setDraft(e.target.value)}>
