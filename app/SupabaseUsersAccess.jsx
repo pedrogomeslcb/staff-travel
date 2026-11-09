@@ -68,8 +68,8 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
   return <section className="overflow-hidden rounded-xl border bg-white">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
       <div><h2 className="font-semibold">Users &amp; access</h2>
-        <p className="text-xs text-slate-500">All admins can view staff accounts and delete regular users.
-          Only the primary admin can reset passwords or change roles.</p></div>
+        <p className="text-xs text-slate-500">All admins can view staff accounts, manage roles, and delete regular users.
+          Only the primary admin can reset passwords or delete other admins.</p></div>
       <button className={button} type="button" disabled={loading||busy} onClick={refresh}>Refresh</button>
     </header>
     {loading&&<p className="p-4 text-sm text-slate-600">Loading users…</p>}
@@ -90,7 +90,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
         <td className="px-4 py-3"><div className="flex flex-wrap gap-2">
           {!person.is_primary_admin&&<button className={button} disabled={busy}
             onClick={()=>open('code',person)}>Edit staff code</button>}
-          {isPrimary&&!person.is_primary_admin&&<button className={button} disabled={busy}
+          {!protectedAccount(person)&&<button className={button} disabled={busy}
             onClick={()=>open('role',person)}>Edit role</button>}
           {isPrimary&&!person.is_primary_admin&&<button className={button} disabled={busy}
             onClick={()=>open('password',person)}>Reset password</button>}
