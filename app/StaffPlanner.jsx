@@ -98,7 +98,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [references,setReferences]=useState(null);
   function applySnapshot(snapshot) {
     if(userRef.current?.id!==snapshot.currentUser?.id) scheduleHistory.current=[];
-    setPeople(connected&&initialUser&&!snapshot.people.some(p=>p.id===initialUser.id)?[initialUser,...snapshot.people.filter(p=>p.name!=='admin')]:snapshot.people);setTrips(snapshot.trips);setSchedule(snapshot.schedule);setTags(snapshot.tags||[]);setUsers(snapshot.users||[]);setPresence(snapshot.presence||[]);setTransferTrips(snapshot.transferTrips||[]);
+    setPeople(snapshot.people);setTrips(snapshot.trips);setSchedule(snapshot.schedule);setTags(snapshot.tags||[]);setUsers(snapshot.users||[]);setPresence(snapshot.presence||[]);setTransferTrips(snapshot.transferTrips||[]);
     setTransferAllocations(snapshot.transferAllocations||{});
     const verified=connected?initialUser:snapshot.currentUser;
     userRef.current=verified;setUser(verified);
