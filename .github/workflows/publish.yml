@@ -1,0 +1,68 @@
+name: Build and publish Staff & Travel
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: staff-travel-deploy
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Fetch project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Restore editable source files (first run only)
+        shell: bash
+        run: |
+          if [ ! -f app/StaffPlanner.jsx ]; then
+            base64 --decode .source-bootstrap.txt | tar -xJ
+            python3 - <<'PY'
+          from pathlib import Path
+          p=Path('github-pages/vite.config.mjs')
+          s=p.read_text()
+          s=s.replace("  plugins: [react()],", "  plugins: [react()],\n  css: { postcss: { plugins: { '@tailwindcss/postcss': {} } } },")
+          p.write_text(s)
+          PY
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app components github-pages lib package.json postcss.config.mjs public
+            git commit -m "Add editable Staff & Travel demo source"
+            git push origin HEAD:main
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Build static Staff & Travel demo
+        run: npm run build:pages
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: out/pages
+
+      - name: Publish Pages
+        uses: actions/deploy-pages@v4
+        id: deployment
