@@ -2,6 +2,14 @@
 
 > The GitHub Pages application uses Supabase Auth and a server-authorized Database. Never add your Supabase service role or secret key to this public repository.
 
+## Shared Schedule directory
+
+**All registered users and admins** appear as team members in Schedule, including their Department tags. The **Primary Admin is deliberately excluded** from the Schedule roster. Ordinary users do not receive everyone's complete staff profile or IHG membership number.
+
+To activate team visibility for ordinary users, run [supabase/schedule-directory.sql](./supabase/schedule-directory.sql) in Supabase SQL Editor once. This adds a read-only, authenticated, server-checked directory RPC and does not weaken the existing row-level security policies on `staff_profiles`.
+
+Until this migration is run, the site remains usable but a normal user may only see their own account in Schedule. Changes to Schedule status/day entries are still browser-local; the shared directory synchronizes **who appears**, not yet everyone else's manually entered schedule statuses.
+
 ## Department tags
 
 The staff admin table and the Edit user dialog now support three Department values:
