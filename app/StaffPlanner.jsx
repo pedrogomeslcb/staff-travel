@@ -72,6 +72,8 @@ function TimeField({label,value,onChange}) {
 }
 
 /** @param {{mode?: string, initialUser?: {id: string, name: string, role: string, authVersion?: number, tagId?: string|null}|null, loginName?: string, staticDemo?: boolean}} props */
+const LAMBANCA_HOTEL = 'InterContinental Luanda Miramar';
+
 export default function StaffPlanner({mode='demo',initialUser=null,loginName='',staticDemo=false,supabaseClient=null,onSupabaseSignOut=null}) {
   const shared=mode==='shared';
   const connected=mode==='supabase'&&!!supabaseClient;
@@ -84,6 +86,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [name,setName]=useState(loginName),[password,setPassword]=useState(''),[user,setUser]=useState(initialUser);
   const [people,setPeople]=useState([]),[trips,setTrips]=useState([]),[schedule,setSchedule]=useState({});
   const [tab,setTab]=useState('planner'),[modal,setModal]=useState(false),[editing,setEditing]=useState(null),[trip,setTrip]=useState({...blank});
+  const [projectOther,setProjectOther]=useState(false);
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[drafts,setDrafts]=useState({}),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [month,setMonth]=useState(()=>new Date()),[scheduleEdit,setScheduleEdit]=useState(null);
   const [scheduleWarning,setScheduleWarning]=useState(null),[hotelFilter,setHotelFilter]=useState('active');
@@ -143,8 +146,17 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       await refreshSaved();setMessage('Access settings saved.');
     }finally{saving.current=false;setBusy(false);}
   }
-  function change(key,value) {setTrip(p=>changeTrip(p,key,value,references?.flights));}
-  function open(record) {setEditing(record?.id??null);setTrip({...toDraft(record),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
+  function change(key,value) {
+    setTrip(p=>{
+      const next=changeTrip(p,key,value,references?.flights);
+      if(key==='project'){
+        if(value==='LAMBANCA')next.hotel=LAMBANCA_HOTEL;
+        else if(p.project==='LAMBANCA'&&p.hotel===LAMBANCA_HOTEL)next.hotel='';
+      }
+      return next;
+    });
+  }
+  function open(record) {setEditing(record?.id??null);setProjectOther(!!record?.project&&record.project!=='LAMBANCA');setTrip({...toDraft(record),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
   async function mutate(action) {if (saving.current) return;saving.current=true;setBusy(true);setError('');try {await action();}catch(e){accessError(e);}finally {saving.current=false;setBusy(false);}}
   function acceptRecord(record) {setTrips(previous=>previous.some(t=>t.id===record.id)?previous.map(t=>t.id===record.id?record:t):[record,...previous]);}
   async function save(e) {
@@ -308,6 +320,24 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     </form>
   </Dialog>}
 
-  {modal&&<Dialog wide title={editing!==null?'Edit hotel request':'Request hotel stay'} onClose={()=>!busy&&setModal(false)}><form onSubmit={save} className="p-6 space-y-6"><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location. {shared||connected?'Requests are saved in the team workspace. Hotel bookings and emails are not sent automatically.':'No requests or emails are sent by this demo.'}</p><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{fixed('Full name',editing!==null?trip.person||user.name:user.name)}{field('Project','project')}{field('Hotel','hotel')}{field('Hotel loyalty number (optional)','membership',false)}{connected&&<p className="text-xs text-slate-500">IHG membership is linked to your username and filled automatically. Ask an admin to update Database → IHG if it is missing.</p>}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><p className="text-xs text-slate-500 mb-3">Enter the flight and airport details from your itinerary. All fields remain editable.</p><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','outFlight')}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','returnFlight')}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div></section><label className="block text-xs text-slate-600">Comments<textarea className={input+' mt-1'} maxLength={2000} rows={3} value={trip.notes} onChange={e=>change('notes',e.target.value)}/></label>{editing!==null&&trip.confirmationNumber&&<p className="text-sm text-amber-800">Changes to a confirmed request require hotel reconfirmation. The confirmation number will be preserved.</p>}{error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}<button disabled={busy} className={button+' w-full'}>{busy?'Saving…':editing!==null?'Save changes':'Save request'}</button></form></Dialog>}
+  {modal&&<Dialog wide title={editing!==null?'Edit hotel request':'Request hotel stay'} onClose={()=>!busy&&setModal(false)}><form onSubmit={save} className="p-6 space-y-6"><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location. {shared||connected?'Requests are saved in the team workspace. Hotel bookings and emails are not sent automatically.':'No requests or emails are sent by this demo.'}</p><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{fixed('Full name',editing!==null?trip.person||user.name:user.name)}
+      <label className="block text-xs text-slate-600">Project
+        <select required className={input+' mt-1'} value={projectOther?'__other':(trip.project==='LAMBANCA'?'LAMBANCA':'')}
+          onChange={e=>{
+            const chosen=e.target.value;
+            setProjectOther(chosen==='__other');
+            change('project',chosen==='__other'?'':chosen);
+          }}>
+          <option value="" disabled>Select a project</option>
+          <option value="LAMBANCA">LAMBANCA</option>
+          <option value="__other">Other project</option>
+        </select>
+      </label>
+      {projectOther&&<label className="block text-xs text-slate-600">Other project name
+        <input required maxLength={80} className={input+' mt-1'} value={trip.project}
+          onChange={e=>change('project',e.target.value)} placeholder="Enter project name"/>
+      </label>}
+      {field('Hotel','hotel')}
+      {trip.project==='LAMBANCA'&&<p className="text-xs text-slate-500">Default hotel for LAMBANCA: {LAMBANCA_HOTEL}. You can adjust it if needed.</p>}{field('Hotel loyalty number (optional)','membership',false)}{connected&&<p className="text-xs text-slate-500">IHG membership is linked to your username and filled automatically. Ask an admin to update Database → IHG if it is missing.</p>}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><p className="text-xs text-slate-500 mb-3">Enter the flight and airport details from your itinerary. All fields remain editable.</p><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','outFlight')}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','returnFlight')}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div></section><label className="block text-xs text-slate-600">Comments<textarea className={input+' mt-1'} maxLength={2000} rows={3} value={trip.notes} onChange={e=>change('notes',e.target.value)}/></label>{editing!==null&&trip.confirmationNumber&&<p className="text-sm text-amber-800">Changes to a confirmed request require hotel reconfirmation. The confirmation number will be preserved.</p>}{error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}<button disabled={busy} className={button+' w-full'}>{busy?'Saving…':editing!==null?'Save changes':'Save request'}</button></form></Dialog>}
   </div>;
 }
