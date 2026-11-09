@@ -116,7 +116,7 @@ export default function SupabaseGate() {
     as GitHub Actions repository variables, then rerun the publish workflow.
   </div>;
   if(identity===undefined)return <div className="p-8 text-center text-sm">Checking account permissions…</div>;
-  if(identity)return <StaffPlanner key={identity.id+'-'+identity.role+'-'+identity.staffCode} mode="supabase"
+  if(identity)return <StaffPlanner key={identity.id+'-'+identity.role+'-'+identity.staffCode+'-'+identity.isPrimaryAdmin+'-'+identity.name} mode="supabase"
     initialUser={identity} loginName={identity.name} supabaseClient={supabase} onSupabaseSignOut={signOut}/>;
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5">
     <div className="w-full max-w-md space-y-4 rounded-2xl border bg-white p-7 shadow-sm">
