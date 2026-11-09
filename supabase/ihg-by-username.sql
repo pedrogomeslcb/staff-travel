@@ -37,6 +37,14 @@ create policy staff_ihg_admin_delete on public.staff_ihg_memberships
   for delete to authenticated
   using ((select public.is_staff_admin()));
 
+-- The old staff-code table is only an administrative migration source now.
+-- Do not allow ordinary users to infer an IHG number from a staff code.
+drop policy if exists ihg_read on public.ihg_memberships;
+drop policy if exists ihg_admin_read on public.ihg_memberships;
+create policy ihg_admin_read on public.ihg_memberships
+  for select to authenticated
+  using ((select public.is_staff_admin()));
+
 -- Migrate only memberships that already have a verifiable staff-code match.
 -- Example: username pg with staff_code P/G receives the old P/G membership.
 -- Unmatched legacy entries A/B, C/D etc. remain safely in the original table
