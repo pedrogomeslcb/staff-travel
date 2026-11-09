@@ -32,8 +32,8 @@ This migration:
 The function verifies the caller's current authenticated Supabase session and checks admin/primary-admin status inside the database before performing any changes.
 
 The admin panel can then:
-- **All admins:** list registered staff and delete non-admin users, link verified staff codes, and edit all hotel requests.
-- **Primary Admin only:** reset another user's password (e.g. `test01`), promote/demote admins, and delete another admin.
+- **All admins:** list registered staff, promote users to Admin, demote other non-primary admins to User, delete non-admin users, link verified staff codes, and edit all hotel requests.
+- **Primary Admin only:** reset another user's password (e.g. `test01`) and delete another admin.
 - **Nobody:** read or reveal existing passwords; Supabase stores password hashes.
 
 The Primary Admin account and deleting your own account are blocked from deletion.
