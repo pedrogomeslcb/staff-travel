@@ -35,7 +35,7 @@ export default function SupabaseGate() {
     const {data:{user},error:authError}=await supabase.auth.getUser();
     if(authError||!user){setIdentity(null);return;}
     const {data:profile,error:profileError}=await supabase.from('staff_profiles')
-      .select('role,staff_code,display_name').eq('user_id',user.id).maybeSingle();
+      .select('role,staff_code,display_name,is_primary_admin,username').eq('user_id',user.id).maybeSingle();
     if(profileError){setIdentity(null);setError('Could not check account permissions: '+profileError.message);return;}
     if(!profile||!['admin','user'].includes(profile.role)){
       setIdentity(null);
@@ -48,6 +48,8 @@ export default function SupabaseGate() {
       name:profile.display_name||profile.staff_code||user.email?.split('@')[0]||'Staff',
       role:profile.role,
       staffCode:profile.staff_code||null,
+      isPrimaryAdmin:profile.is_primary_admin===true,
+      username:profile.username||null,
     });
   },[]);
   useEffect(()=>{
