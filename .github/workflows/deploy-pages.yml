@@ -1,0 +1,48 @@
+name: Publish Staff & Travel
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Enable package manager
+        run: corepack enable
+      - name: Install project
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            corepack pnpm install --frozen-lockfile
+          else
+            npm install --no-audit --no-fund
+          fi
+      - name: Build static site
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            corepack pnpm run build:pages
+          else
+            npm run build:pages
+          fi
+      - uses: actions/configure-pages@v5
+      - name: Disable Jekyll
+        run: touch out/pages/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: out/pages
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
