@@ -8,6 +8,8 @@ const labels={
   hotel_requested:'Marked requested from hotel',hotel_unrequested:'Requested flag cleared',
   hotel_confirmed:'Hotel confirmation saved',hotel_canceled:'Hotel cancellation requested',
   hotel_notified:'Hotel notification recorded',onsite_removed:'Onsite days removed',schedule_changed:'Schedule updated',
+  transfer_updated:'Transfer updated',user_created:'User account created',user_updated:'User account updated',
+  user_deleted:'User account removed',membership_updated:'IHG membership updated',hotel_updated:'Hotel request updated',
 };
 const statusLabels=new Map(SCHEDULE_CATEGORIES.map(([id,label])=>[id,label]));
 const status=value=>statusLabels.get(value)||'No entry';
@@ -15,7 +17,7 @@ const dateTime=new Intl.DateTimeFormat('en-GB',{dateStyle:'short',timeStyle:'med
 const stamp=value=>dateTime.format(new Date(value));
 const fieldValue=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)?display(value):value||'Empty';
 
-export default function TravelAudit({repo,user,trips,shared}) {
+export default function TravelAudit({repo,user,trips,shared,connected=false}) {
   const [events,setEvents]=useState([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
   const [personId,setPersonId]=useState(''),[limit,setLimit]=useState(30),[reload,setReload]=useState(0);
   useEffect(()=>{
@@ -35,8 +37,8 @@ export default function TravelAudit({repo,user,trips,shared}) {
   const filtered=events.filter(event=>!personId||event.personId===personId||event.actorId===personId);
   return <section className="space-y-4 rounded-xl border bg-white p-5">
     <div className="flex flex-wrap justify-between gap-3">
-      <div><h2 className="font-semibold text-slate-900">Travel audit log</h2>
-        <p className="mt-1 text-xs text-slate-600">Schedule and hotel activity · Times shown in your browser’s time zone{shared?'':' · This browser only'}</p>
+      <div><h2 className="font-semibold text-slate-900">{connected?'Activity logs':'Travel audit log'}</h2>
+        <p className="mt-1 text-xs text-slate-600">{connected?'Hotels, schedule, transfers and account changes · Most recent 1,000 events':'Schedule and hotel activity'} · Times shown in your browser’s time zone{shared?'':' · This browser only'}</p>
       </div>
       <button type="button" disabled={loading} className="self-start rounded-lg border px-3 py-2 text-sm text-blue-700" onClick={()=>setReload(value=>value+1)}>Refresh</button>
     </div>
@@ -53,7 +55,7 @@ export default function TravelAudit({repo,user,trips,shared}) {
     <ol className="divide-y border-y">
       {filtered.slice(0,limit).map(event=><li key={event.id} className="space-y-2 py-3 text-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 className="font-semibold text-slate-900">{labels[event.kind]}</h3>
+          <h3 className="font-semibold text-slate-900">{labels[event.kind]||event.kind}</h3>
           <time className="text-xs text-slate-600" dateTime={event.at}>{stamp(event.at)}</time>
         </div>
         <p className="text-xs text-slate-600">By <strong>{event.actorName}</strong> · Team member <strong>{event.personName}</strong></p>
