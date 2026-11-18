@@ -189,7 +189,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
             {personName(person)}
             {person.user_id===currentUser?.id&&<span className="ml-2 text-xs text-slate-400">(You)</span>}
           </th>
-          <td className="px-4 py-3">{person.username||'—'}</td>
+          <td className="px-4 py-3">{person.username?.toUpperCase()||'—'}</td>
           <td className="whitespace-nowrap px-4 py-3">
             {person.department
               ?<span className={'inline-flex rounded-md px-2.5 py-1 text-xs font-medium '+(departmentColor[person.department]||'bg-slate-100 text-slate-700')}>
@@ -222,7 +222,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
             <input className={input+' bg-slate-50'} readOnly value={personName(editor.person)}/>
           </label>
           <label className="block text-xs text-slate-600">Username
-            <input className={input+' bg-slate-50'} readOnly value={editor.person.username||''}/>
+            <input className={input+' bg-slate-50'} readOnly value={editor.person.username?.toUpperCase()||''}/>
           </label>
           <label className="block text-xs text-slate-600">IHG membership number
             <input className={input} maxLength={64} placeholder="Hotel loyalty number"
