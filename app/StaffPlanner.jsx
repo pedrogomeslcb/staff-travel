@@ -140,7 +140,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       setPickupOptions([]);setPickupOptionsError('');setPickupOptionsLoading(false);return;
     }
     let active=true;
-    setPickupOptionsLoading(true);setPickupOptionsError('');
+    setPickupOptions([]);setPickupOptionsLoading(true);setPickupOptionsError('');
     repo.pickupOptions({date,airport,hotel}).then(options=>{
       if(active)setPickupOptions(options);
     }).catch(error=>{
@@ -362,7 +362,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
             </div>
             <button type="button" disabled={busy} className="rounded-md border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
               onClick={()=>{change('pickupTime',option.time);setJoinedPickupTime(option.time);}}>
-              {joinedPickupTime===option.time?'Selected':'Use this transfer'}
+              {joinedPickupTime===option.time&&trip.pickupTime===option.time?'Selected':'Use this transfer'}
             </button>
           </div>;
         })}
