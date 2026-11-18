@@ -217,21 +217,22 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       setTransferAllocations(previous=>({...previous,[key]:allocation}));
     },'Driver allocation updated.');
   }
-  function editSchedule(start,end,status) {
-    setScheduleEdit({start:display(start),end:display(end),status});
+  function editSchedule(start,end,status,targetUserId=user.id) {
+    setScheduleEdit({start:display(start),end:display(end),status,targetUserId});
     setError('');
   }
   function closeScheduleEdit() {setScheduleEdit(null);setError('');}
-  async function saveSchedule(getChanges,{undo=false,acknowledgedHotels=[]}={}) {
+  async function saveSchedule(getChanges,{undo=false,acknowledgedHotels=[],targetUserId=user.id}={}) {
     let count=0;
     await mutate(async()=>{
       setMessage('');
-      const changes=getChanges();
+      const changes=getChanges().map(change=>({...change,...(targetUserId!==user.id?{targetUserId}:{})}));
+      const targetUser=targetUserId===user.id?user:{...user,id:targetUserId};
       let result;
       try {result=await repo.scheduleBatch(user,changes,acknowledgedHotels);}
       catch(error) {
         if(error instanceof HotelReminderError) {
-          setScheduleWarning({changes,hotels:error.hotels,undo});
+          setScheduleWarning({changes,hotels:error.hotels,undo,targetUserId});
           return;
         }
         if(undo&&error.status===409)scheduleHistory.current.pop();
@@ -241,10 +242,10 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
         .filter(entry=>entry.status!==entry.expected);
       if(undo)scheduleHistory.current.pop();
       else if(inverse.length) {
-        scheduleHistory.current.push(inverse);
+        scheduleHistory.current.push({changes:inverse,targetUserId});
         if (scheduleHistory.current.length>50) scheduleHistory.current.shift();
       }
-      setSchedule(previous=>updateScheduleEntries(user,previous,changes));
+      setSchedule(previous=>updateScheduleEntries(targetUser,previous,changes));
       setScheduleEdit(null);
       setScheduleWarning(null);
       count=changes.length;
@@ -257,12 +258,12 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   }
   function saveDateRange(event) {
     event.preventDefault();
-    const {start,end,status}=scheduleEdit;
-    return saveSchedule(()=>scheduleWeekdays(parse(start),parse(end)).map(date=>({date,status})));
+    const {start,end,status,targetUserId}=scheduleEdit;
+    return saveSchedule(()=>scheduleWeekdays(parse(start),parse(end)).map(date=>({date,status})),{targetUserId});
   }
   function undoSchedule() {
-    const changes=scheduleHistory.current.at(-1);
-    if(changes)return saveSchedule(()=>changes,{undo:true});
+    const entry=scheduleHistory.current.at(-1);
+    if(entry)return saveSchedule(()=>entry.changes,{undo:true,targetUserId:entry.targetUserId});
   }
   const visibleTrips=trips.filter(t=>{
     if(user?.role!=='admin')return !t.canceledAt&&t.userId===user?.id;
@@ -310,7 +311,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
 
     {tab==='transport'&&<Transfers trips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} user={user} busy={busy} onSave={saveTransfer} onAllocate={saveDrivers}/>}
 
-    {tab==='planner'&&<Schedule month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={changes=>saveSchedule(()=>changes)} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
+    {tab==='planner'&&<Schedule month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={(changes,targetUserId)=>saveSchedule(()=>changes,{targetUserId})} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
     {tab==='access'&&user.role==='admin'&&(database?<Database database={database} shared={shared||connected} trips={trips} onReferences={setReferences}>{usersAccess}</Database>:usersAccess)}
     {tab==='audit'&&user.role==='admin'&&<TravelAudit repo={repo} user={user} trips={trips} shared={shared||connected} connected={connected}/>}
   </main>
@@ -329,18 +330,18 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     <div className="space-y-4 p-6">
       <p className="text-sm text-slate-700">You are removing Onsite days that overlap a hotel stay marked Requested. If your travel plans changed, make sure the hotel receives a cancellation notice. To record the cancellation here, open Hotel &amp; flights and choose <strong>Cancel request</strong>.</p>
       <ul className="space-y-2">{scheduleWarning.hotels.map(hotel=><li key={hotel.id} className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-        <strong>{hotel.hotel}</strong> · {hotel.status} · {display(hotel.checkin)}–{display(hotel.checkout)}
+        <strong>{visibleHotel(hotel.hotel)||'Hotel request'}</strong> · {hotel.status} · {display(hotel.checkin)}–{display(hotel.checkout)}
         <span className="block text-xs">{hotel.dates.length} affected {hotel.dates.length===1?'weekday':'weekdays'}</span>
       </li>)}</ul>
       {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap gap-3">
-        <button disabled={busy} className={button} onClick={()=>saveSchedule(()=>scheduleWarning.changes,{undo:scheduleWarning.undo,acknowledgedHotels:scheduleWarning.hotels.map(hotel=>hotel.id)})}>{busy?'Saving…':'Save schedule only'}</button>
+        <button disabled={busy} className={button} onClick={()=>saveSchedule(()=>scheduleWarning.changes,{undo:scheduleWarning.undo,acknowledgedHotels:scheduleWarning.hotels.map(hotel=>hotel.id),targetUserId:scheduleWarning.targetUserId})}>{busy?'Saving…':'Save schedule only'}</button>
         <button disabled={busy} onClick={()=>{setScheduleWarning(null);setError('');}}>Keep current schedule</button>
       </div>
     </div>
   </Dialog>}
 
-  {scheduleEdit&&!scheduleWarning&&<Dialog wide title="Set schedule category" onClose={()=>!busy&&closeScheduleEdit()}>
+  {scheduleEdit&&!scheduleWarning&&<Dialog wide title={'Set schedule category'+(scheduleEdit.targetUserId!==user.id?' · '+(people.find(person=>person.id===scheduleEdit.targetUserId)?.name||'Team member'):'')} onClose={()=>!busy&&closeScheduleEdit()}>
     <form className="p-6 space-y-4" onSubmit={saveDateRange}>
       <div className="grid sm:grid-cols-2 gap-4">
         <DateField label="Start date" value={scheduleEdit.start} onChange={start=>setScheduleEdit(previous=>({...previous,start,end:previous.start===previous.end?start:previous.end}))}/>
