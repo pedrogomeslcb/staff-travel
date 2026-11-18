@@ -19,6 +19,14 @@ function signInIdentifier(value) {
   return identifier+'@'+usernameDomain;
 }
 
+function usernameFromName(name) {
+  const words=name.trim().split(/\s+/).filter(Boolean);
+  if(words.length<2)return '';
+  const letters=word=>word.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/gi,'');
+  const first=letters(words[0]),last=letters(words[words.length-1]);
+  return first&&last?(first[0]+'/'+last.slice(0,3)).toUpperCase():'';
+}
+
 export default function SupabaseGate() {
   const [identity,setIdentity]=useState(undefined);
   const [loginName,setLoginName]=useState('');
