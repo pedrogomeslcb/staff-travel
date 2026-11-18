@@ -292,3 +292,33 @@ grant execute on function public.staff_schedule_import(jsonb)
 select table_name
 from information_schema.tables
 where table_schema='public' and table_name='staff_schedule_entries';
+
+-- Separate admin-only RPC: older servers cannot mistake coworker edits for self edits.
+create or replace function public.staff_schedule_apply_admin(
+  p_target_user_id uuid, changes jsonb
+)
+returns jsonb
+language plpgsql security definer set search_path=''
+as $$
+declare
+  patched jsonb;
+begin
+  if auth.uid() is null or not exists (
+    select 1 from public.staff_profiles p
+    where p.user_id=auth.uid() and p.role='admin'
+  ) then raise exception 'Admin access is required' using errcode='42501'; end if;
+  if p_target_user_id is null or not exists (
+    select 1 from public.staff_profiles p
+    where p.user_id=p_target_user_id and p.role in ('admin','user')
+      and p.is_primary_admin=false
+  ) then raise exception 'Target team member cannot be edited' using errcode='42501'; end if;
+  if changes is null or jsonb_typeof(changes)<>'array' then
+    raise exception 'Changes must be a list';
+  end if;
+  select jsonb_agg(item || jsonb_build_object('targetUserId',p_target_user_id::text))
+    into patched from jsonb_array_elements(changes) as elements(item);
+  return public.staff_schedule_apply(patched);
+end;
+$$;
+revoke all on function public.staff_schedule_apply_admin(uuid,jsonb) from public, anon, authenticated;
+grant execute on function public.staff_schedule_apply_admin(uuid,jsonb) to authenticated;
