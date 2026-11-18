@@ -57,7 +57,7 @@ export default function SupabaseGate() {
       name:profile.display_name||profile.username||user.email?.split('@')[0]||'Staff',
       role:profile.role,
       isPrimaryAdmin:profile.is_primary_admin===true,
-      username:profile.username||null,
+      username:profile.username?.toUpperCase()||null,
     });
   },[]);
   useEffect(()=>{
@@ -83,7 +83,7 @@ export default function SupabaseGate() {
   async function register(event) {
     event.preventDefault();
     setError('');setNotice('');
-    const username=generatedUsername.toLowerCase();
+    const username=generatedUsername;
     if(!username){setError('Enter your first and last name to generate a username.');return;}
     if(password.length<6){setError('Choose a password with at least 6 characters.');return;}
     if(password!==confirmPassword){setError('Passwords do not match.');return;}
@@ -144,7 +144,7 @@ export default function SupabaseGate() {
         {view==='login'&&<label className="block text-sm">Username (or primary admin email)
           <input type="text" required autoComplete="username"
             placeholder="e.g. P/GOM" className={input+' mt-1'} value={loginName}
-            onChange={e=>setLoginName(e.target.value)}/></label>}
+            onChange={e=>setLoginName(e.target.value.includes('@')?e.target.value:e.target.value.toUpperCase())}/></label>}
         <label className="block text-sm">Password<input type="password" required
           autoComplete={view==='register'?'new-password':'current-password'}
           minLength={view==='register'?6:undefined}
