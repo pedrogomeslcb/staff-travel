@@ -37,6 +37,20 @@ Browser-only transfer-driver assignments are not cloud events and are not
 included. If you install the Schedule or IHG SQL tables later, rerun this
 activity-logs migration to attach their triggers.
 
+## Transfer pickup suggestions after removing the Hotel field
+
+Run [supabase/transfer-pickup-date-search.sql](./supabase/transfer-pickup-date-search.sql)
+in Supabase SQL Editor once **after**
+[supabase/shared-transfer-pickups.sql](./supabase/shared-transfer-pickups.sql).
+The updated hotel request searches existing return pickups by **date and departure
+airport**, no longer requiring the hidden Hotel field to match. Choosing a
+suggestion copies its time and original pickup location internally, allowing
+the shared transfer group and passenger count to match the existing booking.
+The UI does not display legacy hotel branding or historical project defaults.
+Pickup selection does not automatically guarantee a seat, arrange a driver,
+or send a booking confirmation. If the migration is missing, a visible message
+asks for it; free-text pickup times remain available.
+
 ## Schedule admin permissions and shared transfer passengers
 
 To let admins edit team members' Schedule dates, run
