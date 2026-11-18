@@ -14,8 +14,8 @@ function signInIdentifier(value) {
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier))throw new Error('Enter a valid administrator email.');
     return identifier;
   }
-  if(!/^[a-z0-9][a-z0-9._-]{1,31}$/.test(identifier))
-    throw new Error('Username must have 2–32 letters, numbers, dots, underscores or hyphens.');
+  if(!/^[a-z0-9][a-z0-9._/-]{1,31}$/.test(identifier))
+    throw new Error('Enter a valid username (e.g. P/GOM).');
   return identifier+'@'+usernameDomain;
 }
 
