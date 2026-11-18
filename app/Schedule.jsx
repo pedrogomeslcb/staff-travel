@@ -22,9 +22,10 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
   const [categories,setCategories]=useState(()=>SCHEDULE_CATEGORIES.map(c=>c[0]));
   const [showCodes,setShowCodes]=useState(false);
   const [selectedDay,setSelectedDay]=useState(null);
+  const [editUserId,setEditUserId]=useState(user.id);
   const [focusedDay,setFocusedDay]=useState(null);
   const [selection,setSelection]=useState(null),[selectionMessage,setSelectionMessage]=useState('');
-  const dragAnchor=useRef(null);
+  const dragAnchor=useRef(null),dragPerson=useRef(null);
   const selectionBeforeClick=useRef(null);
   const viewport=useRef(null),prepend=useRef(null),edgeLocked=useRef(false);
   const visibleMonth=useRef(iso(month).slice(0,7)),resizeAnchor=useRef(null),positionedRange=useRef(null);
@@ -37,8 +38,8 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
   const team=useMemo(()=>schedulePeople(people,tags),[people,tags]);
   const available=useMemo(()=>team.filter(p=>sector==='all'||(sector==='unassigned'?!p.tagId:p.tagId===sector)),[team,sector]);
   const members=useMemo(()=>available.filter(p=>personId==='all'||p.id===personId),[available,personId]);
-  const canEdit=ready&&!busy&&team.some(p=>p.id===user.id);
-  const [start,end]=selection&&members.some(p=>p.id===user.id)?[selection.anchor,selection.end].sort():[];
+  const canEdit=ready&&!busy&&(user.role==='admin'?team.length>0:team.some(p=>p.id===user.id));
+  const [start,end]=selection&&members.some(p=>p.id===editUserId)?[selection.anchor,selection.end].sort():[];
   const selectedDates=useMemo(()=>start?dates.filter(date=>date>=start&&date<=end&&!isWeekend(date)):[],[dates,start,end]);
   const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,{...period,categories}),[members,schedule,presence,period,categories]);
   const years=[...new Set([...Array.from({length:11},(_,i)=>period.year-5+i),...Object.keys(schedule).map(k=>Number(k.slice(-10,-6))),...presence.flatMap(t=>[Number(String(t.checkin??'').slice(0,4)),Number(String(t.checkout??'').slice(0,4))])])].filter(y=>Number.isInteger(y)&&y>=1900&&y<=9999).sort((a,b)=>a-b);
@@ -134,22 +135,23 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
     const index=months.findIndex(month=>month.key===visibleMonth.current);
     if(index>=0) viewport.current.scrollLeft=index*monthWidth;
   }
-  function selectDate(date,extend=false,from=date) {
-    setSelection(previous=>({anchor:extend?(start?previous.anchor:from):date,end:date}));
+  function selectDate(date,extend=false,from=date,personId=editUserId) {
+    setSelection(previous=>({anchor:extend&&personId===editUserId?(start?previous?.anchor:from):date,end:date}));
+    setEditUserId(personId);
     setSelectionMessage('');
   }
-  function openDateRange(from,to) {
+  function openDateRange(from,to,personId=editUserId) {
     if (!canEdit) return;
     const defaultDate=period.year===Number(today.slice(0,4))&&period.month===Number(today.slice(5,7))
       ?today:iso(new Date(period.year,period.month-1,1));
     const first=from||defaultDate,last=to||first;
-    const entry=first===last?resolveScheduleDay(schedule,presence,user.id,first):null;
-    onEdit(first,last,entry?.source==='manual'?entry.status:'');
+    const entry=first===last?resolveScheduleDay(schedule,presence,personId,first):null;
+    onEdit(first,last,entry?.source==='manual'?entry.status:'',personId);
   }
   function clipboardText() {
     if (selectedDates.length>MAX_SCHEDULE_CHANGES) throw new Error(`Copy up to ${MAX_SCHEDULE_CHANGES} weekdays at a time.`);
     return selectedDates.map(date=>{
-      const status=resolveScheduleDay(schedule,presence,user.id,date)?.status;
+      const status=resolveScheduleDay(schedule,presence,editUserId,date)?.status;
       return SCHEDULE_CATEGORIES.find(category=>category[0]===status)?.[1]||'Clear';
     }).join('\t');
   }
@@ -170,7 +172,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
     try {
       const text=event.clipboardData.getData('text/plain');
       const changes=schedulePaste(text,start,selectedDates);
-      const count=await onChange(changes);
+      const count=await onChange(changes,editUserId);
       if (count) setSelectionMessage(`Pasted ${count} ${count===1?'weekday':'weekdays'}.`);
     } catch (error) {
       setSelectionMessage(error instanceof PlannerError?error.message:'Select the first destination day and press Ctrl+V to paste.');
@@ -184,9 +186,9 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
     if (!canEdit||event.repeat) return;
     setSelectionMessage('');
     const changes=selectedDates.map(date=>({
-      date,status:resolveScheduleDay({},presence,user.id,date)?SCHEDULE_BLANK:'clear',
+      date,status:resolveScheduleDay({},presence,editUserId,date)?SCHEDULE_BLANK:'clear',
     }));
-    const count=await onChange(changes);
+    const count=await onChange(changes,editUserId);
     if (count) setSelectionMessage('Selected weekdays cleared.');
   }
   useEffect(()=>{
@@ -209,12 +211,12 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
     event.preventDefault();
     viewport.current.querySelector(`button[data-day-view="${next}"]`)?.focus();
   }
-  function moveSelection(event,date) {
+  function moveSelection(event,date,personId) {
     if (!canEdit) return;
     if (event.key==='Enter') {
       event.preventDefault();
-      if (start&&date>=start&&date<=end) openDateRange(start,end);
-      else {selectDate(date);openDateRange(date,date);}
+      if (personId===editUserId&&start&&date>=start&&date<=end) openDateRange(start,end,personId);
+      else {selectDate(date,false,date,personId);openDateRange(date,date,personId);}
     }
     if (event.key==='ArrowLeft'||event.key==='ArrowRight') {
       const step=event.key==='ArrowLeft'?-1:1;
@@ -222,7 +224,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
       while (dates[index]&&isWeekend(dates[index])) index+=step;
       if (!dates[index]) return;
       event.preventDefault();
-      selectDate(dates[index],event.shiftKey,date);
+      selectDate(dates[index],event.shiftKey,date,personId);
       viewport.current.querySelector(`button[data-editable-date="${dates[index]}"]`)?.focus();
     }
     if (event.key==='Escape') {setSelection(null);setSelectionMessage('');}
@@ -269,11 +271,12 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
           </PopoverContent>
         </Popover>
         <button className="text-sm border rounded-lg px-3 py-2 text-blue-700" onClick={()=>jump(new Date())}>Today</button>
-        {team.some(p=>p.id===user.id)&&<button aria-disabled={!canEdit} onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 aria-disabled:opacity-40">Set date range</button>}
+        {canEdit&&user.role==='admin'&&<label className="text-xs text-slate-600">Edit team member <select className="ml-2 rounded-md border px-2 py-2 text-sm" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
+        {canEdit&&<button aria-disabled={!canEdit} onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 aria-disabled:opacity-40">Set date range</button>}
       </div>
     </div>
     <div ref={viewport} onScroll={extendTimeline} onCopy={copySelection} onPaste={pasteSelection} onKeyDown={handleCalendarKey}
-      onPointerUp={()=>{dragAnchor.current=null;}} onPointerCancel={()=>{dragAnchor.current=null;}} onPointerLeave={()=>{dragAnchor.current=null;}}
+      onPointerUp={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerCancel={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerLeave={()=>{dragAnchor.current=null;dragPerson.current=null;}}
       className="overflow-auto max-h-[55vh] border-t [scrollbar-gutter:stable]" role="region" aria-label="Continuous schedule timeline" tabIndex={0}>
       <table className="text-xs" aria-label="Continuous team schedule" style={{tableLayout:'fixed',borderCollapse:'separate',borderSpacing:0,width:nameWidth+months.length*monthWidth}}>
         <colgroup><col style={{width:nameWidth}}/>{dates.map((date,index)=><col key={date} style={{width:columnWidths[index]}}/>)}</colgroup>
@@ -305,7 +308,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
           {dates.map(date=>{
             const isToday=date===today;
             const weekend=isWeekend(date),entry=resolveScheduleDay(schedule,presence,person.id,date),category=SCHEDULE_CATEGORIES.find(c=>c[0]===entry?.status);
-            const editable=!weekend&&person.id===user.id&&ready,selected=editable&&start&&date>=start&&date<=end;
+            const editable=!weekend&&ready&&(person.id===user.id||user.role==='admin'),selected=editable&&person.id===editUserId&&start&&date>=start&&date<=end;
             const description=weekend?'Weekend':category?.[1]||'No entry';
             const detail=entry?.source==='hotel'?' · From hotel request':'';
             const cellStyle=isToday
@@ -314,7 +317,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
             return <td className={'py-1 border-b '+(monthStarts.has(date)?'schedule-month-start':'')}
               style={selected?{backgroundColor:'#DBEAFE',boxShadow:'inset 0 1px #2563EB, inset 0 -1px #2563EB'}:cellStyle} key={date}
               onPointerEnter={editable?event=>{
-                if (canEdit&&event.pointerType==='mouse'&&event.buttons===1&&dragAnchor.current) {
+                if (canEdit&&event.pointerType==='mouse'&&event.buttons===1&&dragAnchor.current&&dragPerson.current===person.id) {
                   selectionBeforeClick.current=null;
                   setSelection({anchor:dragAnchor.current,end:date});
                 }
@@ -332,20 +335,21 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
               onMouseDown={event=>{
                 if (!canEdit||event.button!==0) return;
                 // The first click selects one cell. Retain the original range for a double-click.
-                if (event.detail===1) selectionBeforeClick.current=selected?{date,selection,start,end}:null;
-                dragAnchor.current=event.shiftKey&&start?selection.anchor:date;
-                selectDate(date,event.shiftKey);
+                if (event.detail===1) selectionBeforeClick.current=selected?{date,selection,start,end,personId:person.id}:null;
+                dragPerson.current=person.id;
+                dragAnchor.current=event.shiftKey&&person.id===editUserId&&start?selection.anchor:date;
+                selectDate(date,event.shiftKey,date,person.id);
               }}
-              onClick={event=>{if (canEdit&&event.nativeEvent.pointerType!=='mouse') selectDate(date,event.shiftKey);}}
+              onClick={event=>{if (canEdit&&event.nativeEvent.pointerType!=='mouse') selectDate(date,event.shiftKey,date,person.id);}}
               onDoubleClick={()=>{
                 const previous=selectionBeforeClick.current;
                 selectionBeforeClick.current=null;
-                if (previous?.date===date) {
+                if (previous?.date===date&&previous.personId===person.id) {
                   setSelection(previous.selection);
-                  openDateRange(previous.start,previous.end);
-                } else openDateRange(date,date);
+                  openDateRange(previous.start,previous.end,person.id);
+                } else openDateRange(date,date,person.id);
               }}
-              onKeyDown={event=>moveSelection(event,date)}
+              onKeyDown={event=>moveSelection(event,date,person.id)}
             >{weekend?null:category?(showCodes?category[3]:null):'·'}</button></td>;
           })}
         </tr>;})}</tbody>
