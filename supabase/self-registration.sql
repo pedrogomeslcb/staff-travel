@@ -40,7 +40,8 @@ begin
 
     handle := lower(split_part(new.email, '@', 1));
 
-    if handle !~ '^[a-z0-9][a-z0-9._/-]{1,31} in ('admin', 'root', 'system', 'support') then
+    if handle !~ '^[a-z0-9][a-z0-9._/-]{1,31}$'
+       or handle in ('admin', 'root', 'system', 'support') then
       raise exception 'Invalid or reserved username';
     end if;
 
