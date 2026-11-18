@@ -96,6 +96,7 @@ export default function SupabaseGate() {
         options:{data:{full_name:fullName.trim(),team_access_code:teamCode.trim()}},
       });
       if(signupError)throw signupError;
+      setLoginName(generatedUsername);
       setPassword('');setConfirmPassword('');setTeamCode('');
       if(!data.session){
         setNotice('Account request received but email confirmation is enabled. This username-only setup requires turning off Confirm email in Supabase.');
