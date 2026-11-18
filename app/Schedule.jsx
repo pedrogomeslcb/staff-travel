@@ -13,7 +13,7 @@ import ScheduleDay from './ScheduleDay';
 const todayColumnEdge='inset 1px 0 #BFDBFE, inset -1px 0 #BFDBFE';
 const initialRange=anchor=>({start:new Date(anchor.getFullYear(),anchor.getMonth()-1,1),count:6,anchor:iso(anchor)});
 
-export default function Schedule({month,setMonth,people,trips,tags=[],presence=trips||[],schedule,user,ready,busy,onEdit,onChange,onUndo,sectorLabel='Sector'}) {
+export default function Schedule({month,setMonth,people,trips,tags=[],presence=trips||[],schedule,user,ready,busy,onEdit,onChange,onUndo,sectorLabel='Sector',allowTeamEdit=false}) {
   const today=iso(new Date());
   const [range,setRange]=useState(()=>initialRange(month));
   const [viewportWidth,setViewportWidth]=useState(0);
@@ -38,13 +38,13 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
   const team=useMemo(()=>schedulePeople(people,tags),[people,tags]);
   const available=useMemo(()=>team.filter(p=>sector==='all'||(sector==='unassigned'?!p.tagId:p.tagId===sector)),[team,sector]);
   const members=useMemo(()=>available.filter(p=>personId==='all'||p.id===personId),[available,personId]);
-  const canEdit=ready&&!busy&&(user.role==='admin'?team.length>0:team.some(p=>p.id===user.id));
+  const canEdit=ready&&!busy&&(allowTeamEdit&&user.role==='admin'?team.length>0:team.some(p=>p.id===user.id));
   useEffect(()=>{
-    if(user.role==='admin'&&team.length&&!team.some(person=>person.id===editUserId)){
+    if(allowTeamEdit&&user.role==='admin'&&team.length&&!team.some(person=>person.id===editUserId)){
       setEditUserId(team[0].id);
       setSelection(null);
     }
-  },[editUserId,team,user.role]);
+  },[allowTeamEdit,editUserId,team,user.role]);
   const [start,end]=selection&&members.some(p=>p.id===editUserId)?[selection.anchor,selection.end].sort():[];
   const selectedDates=useMemo(()=>start?dates.filter(date=>date>=start&&date<=end&&!isWeekend(date)):[],[dates,start,end]);
   const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,{...period,categories}),[members,schedule,presence,period,categories]);
@@ -277,7 +277,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
           </PopoverContent>
         </Popover>
         <button className="text-sm border rounded-lg px-3 py-2 text-blue-700" onClick={()=>jump(new Date())}>Today</button>
-        {canEdit&&user.role==='admin'&&<label className="text-xs text-slate-600">Edit team member <select className="ml-2 rounded-md border px-2 py-2 text-sm" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
+        {canEdit&&allowTeamEdit&&user.role==='admin'&&<label className="text-xs text-slate-600">Edit team member <select className="ml-2 rounded-md border px-2 py-2 text-sm" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
         {canEdit&&<button aria-disabled={!canEdit} onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 aria-disabled:opacity-40">Set date range</button>}
       </div>
     </div>
@@ -314,7 +314,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
           {dates.map(date=>{
             const isToday=date===today;
             const weekend=isWeekend(date),entry=resolveScheduleDay(schedule,presence,person.id,date),category=SCHEDULE_CATEGORIES.find(c=>c[0]===entry?.status);
-            const editable=!weekend&&ready&&(person.id===user.id||user.role==='admin'),selected=editable&&person.id===editUserId&&start&&date>=start&&date<=end;
+            const editable=!weekend&&ready&&(person.id===user.id||allowTeamEdit&&user.role==='admin'),selected=editable&&person.id===editUserId&&start&&date>=start&&date<=end;
             const description=weekend?'Weekend':category?.[1]||'No entry';
             const detail=entry?.source==='hotel'?' · From hotel request':'';
             const cellStyle=isToday
