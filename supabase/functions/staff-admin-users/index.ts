@@ -4,25 +4,30 @@
 // NEVER add service/secret keys to GitHub or to the browser build.
 import {createClient} from 'npm:@supabase/supabase-js@2';
 
-const cors={
-  'Access-Control-Allow-Origin':'https://pedrogomeslcb.github.io',
+// Permit the previous GitHub Pages host during migration and the new Pages host.
+// This is an origin allowlist, not an authentication mechanism; the JWT and
+// database admin-role checks below remain mandatory for every privileged action.
+const allowedOrigins=new Set([
+  'https://pedrogomeslcb.github.io',
+  'https://staff-travel-3xn.pages.dev',
+]);
+const corsBase={
   'Access-Control-Allow-Methods':'POST, OPTIONS',
   'Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type',
   'Content-Type':'application/json',
   'Cache-Control':'no-store',
+  'Vary':'Origin',
 };
-function reply(status,payload){
-  return new Response(JSON.stringify(payload),{status,headers:cors});
-}
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 Deno.serve(async request=>{
+  const origin=request.headers.get('origin');
+  const cors={...corsBase,...(allowedOrigins.has(origin)?{'Access-Control-Allow-Origin':origin}:{})};
+  const reply=(status,payload)=>new Response(JSON.stringify(payload),{status,headers:cors});
+  if(origin && !allowedOrigins.has(origin))
+    return reply(403,{error:'Origin not allowed.'});
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
   if(request.method!=='POST')return reply(405,{error:'Method not allowed.'});
-
-  const origin=request.headers.get('origin');
-  if(origin && origin!=='https://pedrogomeslcb.github.io')
-    return reply(403,{error:'Origin not allowed.'});
 
   try {
     const url=Deno.env.get('SUPABASE_URL');
