@@ -37,6 +37,33 @@ Browser-only transfer-driver assignments are not cloud events and are not
 included. If you install the Schedule or IHG SQL tables later, rerun this
 activity-logs migration to attach their triggers.
 
+## Schedule admin permissions and shared transfer passengers
+
+To let admins edit team members' Schedule dates, run
+[supabase/admin-schedule-edit.sql](./supabase/admin-schedule-edit.sql) once
+in Supabase SQL Editor (after the original shared-schedule.sql).
+The new admin-only RPC prevents un-migrated databases from accidentally
+saving a coworker's edits under the admin's own account. Regular users
+can still edit only their own dates; the Primary Admin is not a Schedule target.
+All manual Schedule edits continue to be recorded in the protected Logs table
+when activity logging is installed.
+
+To let users see their transfer co-passengers, run
+[supabase/transfer-copassengers.sql](./supabase/transfer-copassengers.sql)
+in Supabase SQL Editor (after staff profiles and hotel requests exist).
+The RPC returns only names and minimal route data for colleagues booked on
+the authenticated user's exact transfer (same date, time, airport and hotel
+for returns). It does not provide other people's full bookings, confirmation
+numbers, or loyalty numbers. Admins retain their existing full transfer view.
+
+Hotel Request flight-number fields accept free text and offer Database
+flight suggestions: arrival flights have destination NBJ and departure flights
+have origin NBJ. Previous hotel/project values are retained in Supabase for
+historical integrity but the legacy defaults are no longer shown in the UI.
+New requests start with neutral internal placeholders. To group pickups from
+different hotel records, the pickup location must match; flights alone do not
+establish that everyone can use the same vehicle.
+
 ## Shared hotel loyalty numbers and transfer pickup suggestions
 
 These features require two additional **Supabase SQL Editor** migrations. Run
