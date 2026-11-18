@@ -19,7 +19,31 @@ begin
 
     handle := lower(split_part(new.email, '@', 1));
 
-    if handle !~ '^[a-z0-9][a-z0-9._/-]{1,31}
+    if handle !~ '^[a-z0-9][a-z0-9._/-]{1,31} in ('admin', 'root', 'system', 'support') then
+      raise exception 'Invalid or reserved username';
+    end if;
+
+    select access_code_sha256
+      into expected_hash
+      from public.staff_signup_settings
+     where id = 1;
+
+    supplied_code := coalesce(new.raw_user_meta_data ->> 'team_access_code', '');
+
+    if expected_hash is null
+       or encode(sha256(convert_to(supplied_code, 'UTF8')), 'hex') <> expected_hash then
+      raise exception 'Invalid team access code';
+    end if;
+
+    -- Do not store the access code in user metadata.
+    new.raw_user_meta_data :=
+      coalesce(new.raw_user_meta_data, '{}'::jsonb) - 'team_access_code';
+  end if;
+
+  return new;
+end;
+$$;
+
        or handle in ('admin', 'root', 'system', 'support') then
       raise exception 'Invalid or reserved username';
     end if;
