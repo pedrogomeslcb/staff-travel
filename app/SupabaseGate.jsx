@@ -134,13 +134,16 @@ export default function SupabaseGate() {
         ?'New team members can create their own login using the internal team access code. Accounts always start as User.'
         :'Sign in with your username and password. The primary administrator may use an email address.'}</p>
       <form onSubmit={view==='register'?register:login} className="space-y-4">
-        {view==='register'&&<label className="block text-sm">Name and last name<input type="text" required maxLength={120}
-          autoComplete="name" className={input+' mt-1'} value={fullName}
-          onChange={e=>setFullName(e.target.value)}/></label>}
-        <label className="block text-sm">Username {view==='login'?'(or primary admin email)':''}
+        {view==='register'&&<>
+          <label className="block text-sm">Name and last name<input type="text" required maxLength={120}
+            autoComplete="name" className={input+' mt-1'} value={fullName}
+            onChange={e=>setFullName(e.target.value)}/></label>
+          {generatedUsername&&<p className="text-xs text-slate-600" aria-live="polite">Your username: <strong>{generatedUsername}</strong></p>}
+        </>}
+        {view==='login'&&<label className="block text-sm">Username (or primary admin email)
           <input type="text" required autoComplete="username"
-            placeholder="e.g. pg" className={input+' mt-1'} value={loginName}
-            onChange={e=>setLoginName(e.target.value)}/></label>
+            placeholder="e.g. P/GOM" className={input+' mt-1'} value={loginName}
+            onChange={e=>setLoginName(e.target.value)}/></label>}
         <label className="block text-sm">Password<input type="password" required
           autoComplete={view==='register'?'new-password':'current-password'}
           minLength={view==='register'?6:undefined}
