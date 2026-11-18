@@ -1,5 +1,23 @@
 # Staff & Travel — Supabase setup
 
+## Automatically generated login usernames
+
+New users enter **Name and last name** instead of choosing a username.
+The signup form derives the login from the initial of the first name and
+the first three letters of the final surname (for example, **Pedro Gomes → P/GOM**).
+Accents are normalized, and the username is shown as a non-editable preview.
+Existing usernames remain unchanged; sign-in still accepts those and the primary
+administrator's email. Two people generating the same username cannot both
+register with that exact handle; an administrator must resolve such a conflict.
+
+**Required for existing Supabase projects:** Before registering anyone under the
+new scheme, run [supabase/allow-slash-usernames.sql](./supabase/allow-slash-usernames.sql)
+in **Supabase → SQL Editor → New query → Run**. It changes only the signup
+validation function to permit `/` in usernames while retaining the current
+team access code and all existing user records. Do **not** rerun
+`self-registration.sql` just to enable this change: it contains initial
+team-code setup and could reset the current configured code.
+
 > The GitHub Pages application uses Supabase Auth and a server-authorized Database. Never add your Supabase service role or secret key to this public repository.
 
 ## Shared Schedule directory
