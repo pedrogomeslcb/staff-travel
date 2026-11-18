@@ -69,3 +69,31 @@ $$;
   return new;
 end;
 $$;
+
+-- Store the username in uppercase; authentication email remains case-insensitive.
+create or replace function public.create_staff_profile()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  handle text;
+  fullname text;
+begin
+  if lower(split_part(coalesce(new.email, ''), '@', 2)) = 'users.staff-travel.example.com' then
+    handle := lower(split_part(new.email, '@', 1));
+    fullname := left(trim(coalesce(new.raw_user_meta_data ->> 'full_name', '')), 120);
+    if fullname = '' then fullname := handle; end if;
+
+    insert into public.staff_profiles
+      (user_id, role, staff_code, display_name, username, is_primary_admin)
+    values (new.id, 'user', null, fullname, upper(handle), false)
+    on conflict (user_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+-- Normalize existing usernames without altering their login identifiers or passwords.
+update public.staff_profiles
+set username = upper(username)
+where username is not null and username <> upper(username);
