@@ -12,6 +12,7 @@ import SupabaseUsersAccess from './SupabaseUsersAccess';
 import Schedule from './Schedule';
 import Dialog from './Dialog';
 import Transfers from './Transfers';
+import {DRIVERS} from '../lib/transfers.mjs';
 import UsersAccess from './UsersAccess';
 import TravelAudit from './TravelAudit';
 import Database from './Database';
@@ -348,7 +349,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
           return (!departure||!trip.returnTime||(parse(trip.pickupDate)+'T'+option.time<departure+'T'+trip.returnTime))&&
             (!arrival||!trip.outTime||(parse(trip.pickupDate)+'T'+option.time>arrival+'T'+trip.outTime));
         }).map(option=>{
-          const assigned=(option.driverIds||[]).map(id=>(references?.drivers||[]).find(driver=>driver.id===id)).filter(Boolean);
+          const assigned=(option.driverIds||[]).map(id=>(references?.drivers?.length?references.drivers:DRIVERS).find(driver=>driver.id===id)).filter(Boolean);
           const driversText=assigned.length
             ?assigned.map(driver=>driver.name+(driver.licensePlate?' · '+driver.licensePlate:'')).join(' / ')
             :option.assignedDriver||'Driver not assigned yet';
