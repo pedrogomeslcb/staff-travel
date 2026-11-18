@@ -102,7 +102,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [transferPassengersReady,setTransferPassengersReady]=useState(!connected);
   const [references,setReferences]=useState(null);
   const [pickupOptions,setPickupOptions]=useState([]),[pickupOptionsError,setPickupOptionsError]=useState('');
-  const [pickupOptionsLoading,setPickupOptionsLoading]=useState(false),[joinedPickupTime,setJoinedPickupTime]=useState('');
+  const [pickupOptionsLoading,setPickupOptionsLoading]=useState(false),[pickupLookupDone,setPickupLookupDone]=useState(false),[joinedPickupTime,setJoinedPickupTime]=useState('');
   function applySnapshot(snapshot) {
     if(userRef.current?.id!==snapshot.currentUser?.id) scheduleHistory.current=[];
     setPeople(snapshot.people);setTrips(snapshot.trips);setSchedule(snapshot.schedule);setTags(snapshot.tags||[]);setUsers(snapshot.users||[]);setPresence(snapshot.presence||[]);setTransferTrips(snapshot.transferTrips||[]);
@@ -139,20 +139,20 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   },[database,user?.id]);
   useEffect(()=>{
     if(!connected||!modal)return;
-    const date=parse(trip.pickupDate),airport=trip.returnOrigin.trim().toUpperCase(),hotel=trip.hotel.trim();
+    const date=parse(trip.pickupDate),airport=trip.returnOrigin.trim().toUpperCase();
     setJoinedPickupTime('');
-    if(!date||!airport||!hotel){
-      setPickupOptions([]);setPickupOptionsError('');setPickupOptionsLoading(false);return;
+    if(!date||!airport){
+      setPickupOptions([]);setPickupOptionsError('');setPickupOptionsLoading(false);setPickupLookupDone(false);return;
     }
     let active=true;
-    setPickupOptions([]);setPickupOptionsLoading(true);setPickupOptionsError('');
-    repo.pickupOptions({date,airport,hotel}).then(options=>{
-      if(active)setPickupOptions(options);
+    setPickupOptions([]);setPickupOptionsLoading(true);setPickupOptionsError('');setPickupLookupDone(false);
+    repo.pickupOptions({date,airport}).then(options=>{
+      if(active){setPickupOptions(options);setPickupLookupDone(true);}
     }).catch(error=>{
       if(active){setPickupOptions([]);setPickupOptionsError(error.message||'Unable to check existing pickups.');}
     }).finally(()=>{if(active)setPickupOptionsLoading(false);});
     return ()=>{active=false;};
-  },[connected,modal,trip.pickupDate,trip.returnOrigin,trip.hotel,repo]);
+  },[connected,modal,trip.pickupDate,trip.returnOrigin,repo]);
 
   async function login(e) {
     e.preventDefault();if(saving.current)return;saving.current=true;setBusy(true);setError('');
@@ -173,7 +173,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     }finally{saving.current=false;setBusy(false);}
   }
   function change(key,value) {setTrip(p=>changeTrip(p,key,value,references?.flights));}
-  function open(record) {setEditing(record?.id??null);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:old.membership||data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
+  function open(record) {setEditing(record?.id??null);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:old.membership||data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
   async function mutate(action) {if (saving.current) return;saving.current=true;setBusy(true);setError('');try {await action();}catch(e){accessError(e);}finally {saving.current=false;setBusy(false);}}
   function acceptRecord(record) {setTrips(previous=>previous.some(t=>t.id===record.id)?previous.map(t=>t.id===record.id?record:t):[record,...previous]);}
   async function save(e) {
@@ -363,29 +363,31 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
 
   {modal&&<Dialog wide title={editing!==null?'Edit hotel request':'Request hotel stay'} onClose={()=>!busy&&setModal(false)}><form onSubmit={save} className="p-6 space-y-6"><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location. {shared||connected?'Requests are saved in the team workspace. Hotel bookings and emails are not sent automatically.':'No requests or emails are sent by this demo.'}</p><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{fixed('Full name',editing!==null?trip.person||user.name:user.name)}
       {field('Hotel loyalty number (optional)','membership',false)}{connected&&<p className="text-xs text-slate-500">Your saved IHG number is filled automatically. When IHG synchronization is enabled, entering a number in your own hotel request also updates Database → IHG.</p>}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><p className="text-xs text-slate-500 mb-3">Enter the flight and airport details from your itinerary. All fields remain editable.</p><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','outFlight',arrivalOptions)}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','returnFlight',departureOptions)}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div>
+      {connected&&parse(trip.pickupDate)&&!trip.returnOrigin.trim()&&<p className="mt-3 text-xs text-slate-600">Enter the return-flight departure airport above to find existing transfers for this date.</p>}
       {connected&&pickupOptionsLoading&&<p role="status" className="mt-3 text-xs text-slate-600">Checking existing transfers for this pickup date…</p>}
+      {connected&&pickupLookupDone&&!pickupOptionsLoading&&!pickupOptionsError&&!eligiblePickupOptions.length&&<p className="mt-3 text-xs text-slate-600">No compatible transfers found for this date and departure airport. You can enter a new pickup time.</p>}
       {connected&&pickupOptionsError&&<p className="mt-3 text-xs text-amber-800">{pickupOptionsError} You may still enter your pickup time manually.</p>}
       {connected&&eligiblePickupOptions.length>0&&<div className="mt-4 space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3" role="group" aria-label="Existing hotel pickups">
         <p className="text-sm font-semibold text-blue-900">Join an existing hotel → airport transfer?</p>
-        <p className="text-xs text-slate-600">Other team members have a pickup at this hotel, on this date, going to the same airport. Choose an existing time if it also suits your return flight.</p>
+        <p className="text-xs text-slate-600">Other team members have a pickup on this date for the same departure airport. Choose one only if you can depart from the same pickup location and the time suits your flight.</p>
         {eligiblePickupOptions.map(option=>{
           const assigned=(option.driverIds||[]).map(id=>(references?.drivers?.length?references.drivers:DRIVERS).find(driver=>driver.id===id)).filter(Boolean);
           const driversText=assigned.length
             ?assigned.map(driver=>driver.name+(driver.licensePlate?' · '+driver.licensePlate:'')).join(' / ')
             :option.assignedDriver||'Driver not assigned yet';
-          return <div key={option.time} className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white p-3">
+          return <div key={option.time+'|'+option.pickupLocation} className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-white p-3">
             <div>
               <p className="text-sm font-semibold text-slate-800">{display(parse(trip.pickupDate))} · {option.time}</p>
               <p className="text-xs text-slate-700">Requested by <strong>{option.requestedBy}</strong></p>
               <p className="text-xs text-slate-600">{driversText}</p>
             </div>
             <button type="button" disabled={busy} className="rounded-md border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-              onClick={()=>{change('pickupTime',option.time);setJoinedPickupTime(option.time);}}>
-              {joinedPickupTime===option.time&&trip.pickupTime===option.time?'Selected':'Use this transfer'}
+              onClick={()=>{setTrip(previous=>({...previous,pickupTime:option.time,hotel:option.pickupLocation}));setJoinedPickupTime(option.time);}}> 
+              {joinedPickupTime===option.time&&trip.pickupTime===option.time&&trip.hotel===option.pickupLocation?'Selected':'Use this transfer'}
             </button>
           </div>;
         })}
-        <p className="text-xs text-slate-600">Selecting copies the pickup time into your request and groups matching transfers. Vehicle seats and driver allocation remain subject to administrator confirmation.</p>
+        <p className="text-xs text-slate-600">Selecting also adopts the existing pickup location internally so your request joins the same transfer group. Vehicle seats and driver allocation remain subject to administrator confirmation.</p>
       </div>}</section><label className="block text-xs text-slate-600">Comments<textarea className={input+' mt-1'} maxLength={2000} rows={3} value={trip.notes} onChange={e=>change('notes',e.target.value)}/></label>{editing!==null&&trip.confirmationNumber&&<p className="text-sm text-amber-800">Changes to a confirmed request require hotel reconfirmation. The confirmation number will be preserved.</p>}{error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}<button disabled={busy} className={button+' w-full'}>{busy?'Saving…':editing!==null?'Save changes':'Save request'}</button></form></Dialog>}
   </div>;
 }
