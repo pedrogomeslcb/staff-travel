@@ -175,3 +175,28 @@ revoke all on function public.staff_transfer_pickup_options(date,text,text)
 from public, anon, authenticated;
 grant execute on function public.staff_transfer_pickup_options(date,text,text)
 to authenticated;
+
+-- When the optional admin activity log is installed, record allocation changes
+-- without copying hotel bookings, employee data, or driver phone numbers.
+create or replace function public.staff_log_transfer_assignment()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+begin
+  if tg_op='UPDATE' then
+    if old.driver_ids is not distinct from new.driver_ids then return new; end if;
+  end if;
+  if to_regclass('public.staff_activity_logs') is not null then
+    perform public.staff_append_activity('transfer_updated',null,'Shared transfer',
+      jsonb_build_object('changes',jsonb_build_array(jsonb_build_object(
+        'label', new.day::text||' '||new.pickup_time||' · '||new.leg||' · Drivers',
+        'before',case when tg_op='INSERT' then '' else array_to_string(old.driver_ids,', ') end,
+        'after',array_to_string(new.driver_ids,', ')))));
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.staff_log_transfer_assignment() from public, anon, authenticated;
+drop trigger if exists staff_transfer_assignment_audit on public.staff_transfer_assignments;
+create trigger staff_transfer_assignment_audit
+after insert or update on public.staff_transfer_assignments
+for each row execute function public.staff_log_transfer_assignment();
