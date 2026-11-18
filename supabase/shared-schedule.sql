@@ -45,6 +45,9 @@ set search_path = ''
 as $$
 declare
   actor uuid := auth.uid();
+  target uuid := auth.uid();
+  target_text text;
+  actor_role text;
   total integer;
   change jsonb;
   date_string text;
@@ -72,8 +75,35 @@ begin
     raise exception 'Select between 1 and 366 weekdays to update';
   end if;
 
-  -- Serialize this user's concurrent changes to make optimistic checks reliable.
-  perform pg_advisory_xact_lock(hashtextextended(actor::text, 0));
+  -- A targetUserId is optional. Omitted means edit only your own dates.
+  -- Admins may target other registered employees, except the primary
+  -- administrator (who is intentionally excluded from the team roster).
+  target_text := changes->0->>'targetUserId';
+  if target_text is not null then
+    begin
+      target := target_text::uuid;
+    exception when others then
+      raise exception 'Invalid target team member';
+    end;
+  end if;
+  if target is distinct from actor then
+    select role into actor_role from public.staff_profiles where user_id=actor;
+    if actor_role is distinct from 'admin' then
+      raise exception 'Only admins may edit a colleague''s Schedule'
+        using errcode='42501';
+    end if;
+  end if;
+  if not exists (
+    select 1 from public.staff_profiles p
+    where p.user_id=target and p.role in ('admin','user')
+      and (p.is_primary_admin=false or target=actor)
+  ) then
+    raise exception 'Target team member not found or cannot be edited'
+      using errcode='42501';
+  end if;
+
+  -- Serialize concurrent edits to the same team member, regardless of editor.
+  perform pg_advisory_xact_lock(hashtextextended(target::text, 0));
 
   -- Validate everything before modifying any row: one atomic save.
   for change in select value from jsonb_array_elements(changes)
@@ -83,6 +113,9 @@ begin
     end if;
     date_string := change->>'date';
     requested := change->>'status';
+    if (change ? 'targetUserId') and change->>'targetUserId' is distinct from target::text then
+      raise exception 'All changes must target the same team member';
+    end if;
 
     if date_string is null
       or date_string !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -107,7 +140,7 @@ begin
 
     select s.status into previous_status
     from public.staff_schedule_entries s
-    where s.user_id=actor and s.day=day_value;
+    where s.user_id=target and s.day=day_value;
 
     previous_status := coalesce(previous_status, 'clear');
     previous_values := previous_values ||
@@ -128,10 +161,10 @@ begin
     requested := change->>'status';
     if requested = 'clear' then
       delete from public.staff_schedule_entries
-      where user_id=actor and day=day_value;
+      where user_id=target and day=day_value;
     else
       insert into public.staff_schedule_entries(user_id,day,status,updated_at)
-      values (actor,day_value,requested,now())
+      values (target,day_value,requested,now())
       on conflict (user_id,day)
       do update set status=excluded.status,updated_at=excluded.updated_at;
     end if;
