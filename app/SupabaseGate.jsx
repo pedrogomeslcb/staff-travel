@@ -32,6 +32,7 @@ export default function SupabaseGate() {
   const [loginName,setLoginName]=useState('');
   const [view,setView]=useState('login');
   const [fullName,setFullName]=useState('');
+  const generatedUsername=usernameFromName(fullName);
   const [teamCode,setTeamCode]=useState('');
   const [confirmPassword,setConfirmPassword]=useState('');
   const [notice,setNotice]=useState('');
