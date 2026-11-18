@@ -130,7 +130,7 @@ export default function SupabaseGate() {
         ?'New team members can create their own login using the internal team access code. Accounts always start as User.'
         :'Sign in with your username and password. The primary administrator may use an email address.'}</p>
       <form onSubmit={view==='register'?register:login} className="space-y-4">
-        {view==='register'&&<label className="block text-sm">Full name<input type="text" required maxLength={120}
+        {view==='register'&&<label className="block text-sm">Name and last name<input type="text" required maxLength={120}
           autoComplete="name" className={input+' mt-1'} value={fullName}
           onChange={e=>setFullName(e.target.value)}/></label>}
         <label className="block text-sm">Username {view==='login'?'(or primary admin email)':''}
