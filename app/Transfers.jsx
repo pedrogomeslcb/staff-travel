@@ -13,15 +13,15 @@ const personLabel=n=>`${n} ${n===1?'person':'people'}`;
 const seatLabel=n=>`${n} ${n===1?'seat':'seats'}`;
 const weekday=date=>new Date(date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'});
 
-function TransferSlot({group,isAdmin,busy,onEdit,onAllocate,onRemove}) {
-  const [expanded,setExpanded]=useState(false),passengersId=useId();
+function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,onRemove}) {
+  const passengersId=useId();
   const arrival=group.leg==='arrival',route=routes[group.leg];
   const flight=group.flights.length===1?`Flight ${group.flights[0]}`:group.flights.length>1?`${group.flights.length} flights`:'Flight to confirm';
   const canAssign=isAdmin&&group.people>0&&group.assignable;
   return <article aria-label={`${group.time||'Time to confirm'} · ${route}`}>
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5">
       <h4 className="min-w-48 flex-1">
-        <button type="button" aria-expanded={expanded} aria-controls={passengersId} onClick={()=>setExpanded(value=>!value)}
+        <button type="button" aria-expanded={expanded} aria-controls={passengersId} onClick={onToggle}
           className="flex w-full items-center gap-2 rounded-md py-1 text-left hover:bg-slate-50">
           <ChevronRight aria-hidden="true" className={'size-4 shrink-0 text-slate-500 '+(expanded?'rotate-90':'')}/>
           <span title={group.time?undefined:'Time to confirm'}
@@ -88,8 +88,23 @@ function TransferSlot({group,isAdmin,busy,onEdit,onAllocate,onRemove}) {
 export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate}) {
   const [editing,setEditing]=useState(null),[allocation,setAllocation]=useState(null),[error,setError]=useState('');
   const [direction,setDirection]=useState('all'),[period,setPeriod]=useState('upcoming'),[includeCanceled,setIncludeCanceled]=useState(false);
-  const [expandedDays,setExpandedDays]=useState({}),dayIdPrefix=useId();
+  const [expandedDays,setExpandedDays]=useState({}),[expandedSlots,setExpandedSlots]=useState({});
+  const [expansionMode,setExpansionMode]=useState('auto'),dayIdPrefix=useId();
   const today=iso(new Date()),plan=buildTransferPlan(trips,{direction,period,today,includeCanceled,allocations,drivers});
+  const nearestDay=plan.days.reduce((best,day)=>{
+    if(!day.date)return best;
+    const distance=Math.abs(Date.parse(day.date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'));
+    const bestDistance=best?Math.abs(Date.parse(best.date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z')):Infinity;
+    return distance<bestDistance?day:best;
+  },null);
+  const nearestSlotKey=nearestDay?.groups[0]?.key;
+  const isExpandedDay=date=>expandedDays[date]??(expansionMode==='all'||(expansionMode==='auto'&&date===nearestDay?.date));
+  const isExpandedSlot=key=>expandedSlots[key]??(expansionMode==='all'||(expansionMode==='auto'&&key===nearestSlotKey));
+  function setAllExpanded(value){
+    setExpansionMode(value?'all':'none');
+    setExpandedDays({});
+    setExpandedSlots({});
+  }
   const isAdmin=user.role==='admin',multiple=allocation?.group.people>3;
   const selectedSeats=drivers.reduce((sum,driver)=>sum+(allocation?.driverIds.includes(driver.id)?driver.capacity:0),0);
   function open(entry) {setEditing({...entry,status:entry.transfer.status});setError('');}
@@ -134,6 +149,10 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
           <option value="all">All transfers</option><option value="arrival">Arrivals</option><option value="return">Hotel pickups</option>
         </select>
         <label className="flex items-center gap-1.5 px-1 text-xs text-slate-600"><input type="checkbox" checked={includeCanceled} onChange={e=>setIncludeCanceled(e.target.checked)}/>Include canceled</label>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button type="button" disabled={!plan.days.length} onClick={()=>setAllExpanded(true)} className="rounded-md border px-2.5 py-1.5 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50">Expand all</button>
+          <button type="button" disabled={!plan.days.length} onClick={()=>setAllExpanded(false)} className="rounded-md border px-2.5 py-1.5 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50">Collapse all</button>
+        </div>
       </div>
       <p className="text-xs text-slate-500">Local times. Arrivals follow the flight and returns use the scheduled hotel pickup time.</p>
     </section>
@@ -141,7 +160,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     {!plan.days.length&&<div className="bg-white border rounded-xl p-10 text-center"><p className="font-medium text-slate-700">{trips.length?'No transfers match these filters.':'No transfers yet.'}</p><p className="text-sm text-slate-500 mt-2">{trips.length?'Try All dates or another transfer direction.':'Create a hotel request to add arrival and return transfers.'}</p>{trips.length>0&&<button className="text-sm text-blue-700 mt-4" onClick={()=>{setPeriod('all');setDirection('all');setIncludeCanceled(true);}}>Show all transfers</button>}</div>}
     <div className="space-y-3" aria-label="Transfers by day">
       {plan.days.map((day,index)=>{
-        const expanded=expandedDays[day.date]??(index===0),slotsId=dayIdPrefix+'-'+(day.date||'undated');
+        const expanded=isExpandedDay(day.date),slotsId=dayIdPrefix+'-'+(day.date||'undated');
         const counts=[
           day.arrivals>0&&`${day.arrivals} arriving`,
           day.pickups>0&&`${day.pickups} returning`,
@@ -161,7 +180,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
             </button>
           </h3>
           <div id={slotsId} hidden={!expanded} className="divide-y border-t">
-            {day.groups.map(group=><TransferSlot key={group.key} group={group} isAdmin={isAdmin} busy={busy} onEdit={open} onAllocate={openAllocation} onRemove={removeDriver}/>)}
+            {day.groups.map(group=><TransferSlot key={group.key} group={group} expanded={isExpandedSlot(group.key)} onToggle={()=>setExpandedSlots(previous=>({...previous,[group.key]:!isExpandedSlot(group.key)}))} isAdmin={isAdmin} busy={busy} onEdit={open} onAllocate={openAllocation} onRemove={removeDriver}/>)}
           </div>
         </section>;
       })}
