@@ -158,7 +158,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
       <p className="text-xs text-slate-500">Local times. Arrivals follow the flight and returns use the scheduled hotel pickup time.</p>
     </section>
     {!passengersShared&&user.role!=='admin'&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Shared passenger details are not enabled yet. An admin must run supabase/transfer-copassengers.sql in Supabase SQL Editor.</p>}
-    {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
+    {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!plan.days.length&&<div className="bg-white border rounded-xl p-10 text-center"><p className="font-medium text-slate-700">{trips.length?'No transfers match these filters.':'No transfers yet.'}</p><p className="text-sm text-slate-500 mt-2">{trips.length?'Try All dates or another transfer direction.':'Create a hotel request to add arrival and return transfers.'}</p>{trips.length>0&&<button className="text-sm text-blue-700 mt-4" onClick={()=>{setPeriod('all');setDirection('all');setIncludeCanceled(true);}}>Show all transfers</button>}</div>}
     <div className="space-y-3" aria-label="Transfers by day">
       {plan.days.map((day,index)=>{
