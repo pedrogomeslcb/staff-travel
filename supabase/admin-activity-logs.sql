@@ -66,7 +66,9 @@ declare
   field_label text;
   target_name text;
 begin
-  if tg_op = 'UPDATE' and new.record is not distinct from old.record then return new; end if;
+  if tg_op = 'UPDATE' then
+    if new.record is not distinct from old.record then return new; end if;
+  end if;
   if tg_op = 'INSERT' then
     kind := 'hotel_created';
   elsif nullif(new.record->>'canceledAt','') is distinct from nullif(old.record->>'canceledAt','') then
@@ -177,9 +179,9 @@ begin
       alterations := alterations || jsonb_build_array(jsonb_build_object(
         'label','Role','before',old.role,'after',new.role));
     end if;
-    if old.department is distinct from new.department then
+    if to_jsonb(old)->>'department' is distinct from to_jsonb(new)->>'department' then
       alterations := alterations || jsonb_build_array(jsonb_build_object(
-        'label','Department','before',old.department,'after',new.department));
+        'label','Department','before',to_jsonb(old)->>'department','after',to_jsonb(new)->>'department'));
     end if;
     if upper(coalesce(old.username,'')) is distinct from upper(coalesce(new.username,'')) then
       alterations := alterations || jsonb_build_array(jsonb_build_object(
@@ -204,8 +206,8 @@ declare
   target_name text;
 begin
   account_id := case when tg_op = 'DELETE' then old.user_id else new.user_id end;
-  if tg_op = 'UPDATE' and old.membership is not distinct from new.membership then
-    return null;
+  if tg_op = 'UPDATE' then
+    if old.membership is not distinct from new.membership then return null; end if;
   end if;
   select display_name into target_name from public.staff_profiles where user_id=account_id;
   perform public.staff_append_activity('membership_updated',account_id,target_name,
