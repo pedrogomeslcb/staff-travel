@@ -6,19 +6,36 @@ New users enter **Name and last name** instead of choosing a username.
 The signup form derives the login from the initial of the first name and
 the first three letters of the final surname (for example, **Pedro Gomes → P/GOM**).
 Accents are normalized, and the username is shown as a non-editable preview.
-Existing usernames remain unchanged; sign-in still accepts those and the primary
-administrator's email. Two people generating the same username cannot both
+Usernames are displayed and stored in **uppercase** after the migration; sign-in
+remains case-insensitive, and existing credentials and the primary administrator's
+email continue working. Two people generating the same username cannot both
 register with that exact handle; an administrator must resolve such a conflict.
 
 **Required for existing Supabase projects:** Before registering anyone under the
 new scheme, run [supabase/allow-slash-usernames.sql](./supabase/allow-slash-usernames.sql)
-in **Supabase → SQL Editor → New query → Run**. It changes only the signup
-validation function to permit `/` in usernames while retaining the current
-team access code and all existing user records. Do **not** rerun
+in **Supabase → SQL Editor → New query → Run**. It repairs the signup
+validation function, allows `/` in usernames, and uppercases existing
+profile usernames. It does not change account emails, passwords, user IDs,
+or the existing private team access code. Do **not** rerun
 `self-registration.sql` just to enable this change: it contains initial
 team-code setup and could reset the current configured code.
 
 > The GitHub Pages application uses Supabase Auth and a server-authorized Database. Never add your Supabase service role or secret key to this public repository.
+
+## Administrator-only activity logs
+
+Run [supabase/admin-activity-logs.sql](./supabase/admin-activity-logs.sql)
+in **Supabase → SQL Editor → New query → Run** to enable the **Logs** tab.
+The table is protected by Supabase row-level security: only authenticated
+Admins may read it. Browser clients cannot insert, modify, or delete events.
+
+It records new cloud changes to hotel requests, transfer status, shared schedule,
+staff roles/departments and IHG membership records. Passwords and membership
+numbers are not written to logs. Activity capture starts when the SQL is applied
+and does not retrospectively recover edits that were made before installation.
+Browser-only transfer-driver assignments are not cloud events and are not
+included. If you install the Schedule or IHG SQL tables later, rerun this
+activity-logs migration to attach their triggers.
 
 ## Shared Schedule directory
 
