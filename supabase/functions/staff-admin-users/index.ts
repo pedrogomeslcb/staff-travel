@@ -10,6 +10,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2';
 const allowedOrigins=new Set([
   'https://pedrogomeslcb.github.io',
   'https://staff-travel-3xn.pages.dev',
+  'https://staffplanner.pages.dev',
 ]);
 const corsBase={
   'Access-Control-Allow-Methods':'POST, OPTIONS',
