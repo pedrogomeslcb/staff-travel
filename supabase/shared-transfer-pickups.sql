@@ -45,14 +45,14 @@ begin
     where user_id=actor and role='admin'
   ) then raise exception 'Admin access is required' using errcode='42501'; end if;
   if p_key is null or char_length(p_key) not between 10 and 512
-    or p_day is null or p_time !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-    or p_leg not in ('arrival','return')
+    or p_day is null or p_time is null or p_time !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+    or p_leg is null or p_leg not in ('arrival','return')
     or char_length(cleaned_airport) not between 2 and 12
     or (p_leg='return' and cleaned_hotel='')
     or p_revision is null or p_revision<0
     or p_driver_ids is null or cardinality(p_driver_ids)>3
     or not (p_driver_ids <@ array['jos','vla','ota']::text[])
-    or (select count(distinct val) from unnest(p_driver_ids) as val) <> cardinality(p_driver_ids) then
+    or (select count(distinct value) from unnest(p_driver_ids) as choices(value)) <> cardinality(p_driver_ids) then
     raise exception 'Invalid transfer assignment'; end if;
   if p_leg='arrival' then cleaned_hotel := ''; end if;
 
