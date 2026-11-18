@@ -39,6 +39,12 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
   const available=useMemo(()=>team.filter(p=>sector==='all'||(sector==='unassigned'?!p.tagId:p.tagId===sector)),[team,sector]);
   const members=useMemo(()=>available.filter(p=>personId==='all'||p.id===personId),[available,personId]);
   const canEdit=ready&&!busy&&(user.role==='admin'?team.length>0:team.some(p=>p.id===user.id));
+  useEffect(()=>{
+    if(user.role==='admin'&&team.length&&!team.some(person=>person.id===editUserId)){
+      setEditUserId(team[0].id);
+      setSelection(null);
+    }
+  },[editUserId,team,user.role]);
   const [start,end]=selection&&members.some(p=>p.id===editUserId)?[selection.anchor,selection.end].sort():[];
   const selectedDates=useMemo(()=>start?dates.filter(date=>date>=start&&date<=end&&!isWeekend(date)):[],[dates,start,end]);
   const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,{...period,categories}),[members,schedule,presence,period,categories]);
@@ -239,7 +245,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
               <p className="font-semibold text-slate-900">Schedule shortcuts</p>
               <p>Open Filters to select a month or use Fit month. Swipe or scroll horizontally to move between months.</p>
               <p>Click a date in the header to see who is onsite or in another category that day. Use the arrow keys to move between dates.</p>
-              <p>Drag or Shift-click to select weekdays in your row. Double-click inside the selection to edit the whole range.</p>
+              <p>Drag or Shift-click to select weekdays in your row. Double-click inside the selection to edit the whole range. Admins can also select and edit a colleague’s row.</p>
               <p><kbd>Ctrl+C</kbd> copies the selection. Select the first destination day and press <kbd>Ctrl+V</kbd> to paste.</p>
               <p><kbd>Delete</kbd> or <kbd>Backspace</kbd> clears the selected weekdays. To restore hotel-based entries, use the hotel default in the category menu.</p>
               <p><kbd>Ctrl+Z</kbd> undoes the last schedule edit in this session.</p>
