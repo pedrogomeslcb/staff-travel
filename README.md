@@ -37,6 +37,32 @@ Browser-only transfer-driver assignments are not cloud events and are not
 included. If you install the Schedule or IHG SQL tables later, rerun this
 activity-logs migration to attach their triggers.
 
+## Shared hotel loyalty numbers and transfer pickup suggestions
+
+These features require two additional **Supabase SQL Editor** migrations. Run
+them after the existing staff, hotel, and IHG tables have been installed:
+
+1. [supabase/auto-ihg-from-hotel.sql](./supabase/auto-ihg-from-hotel.sql):
+   saves the hotel-request owner's non-empty IHG number into
+   `staff_ihg_memberships`. Users cannot change another user's IHG record.
+   The Database → IHG screen then reads that same shared table.
+2. [supabase/shared-transfer-pickups.sql](./supabase/shared-transfer-pickups.sql):
+   stores driver allocations centrally and provides a limited RPC for finding
+   **same-date, same-hotel, same-airport** return pickups. The request form
+   shows the requesting usernames, scheduled pickup time and allocated driver,
+   if any. Accepting an option sets the same pickup time so the request joins
+   the existing group; it is not a booking or guaranteed seat.
+
+The shared transfer table is administrator-controlled. Regular users can only
+retrieve allocations relevant to their own requests and matching pickup
+suggestions; they cannot enumerate another person's hotel or flight details.
+The current GitHub Pages/Cloudflare frontend works after those SQL migrations,
+without another Edge Function deployment. If the SQL is missing, the request
+form allows manual pickup times but explains why suggestions are unavailable.
+Existing browser-only driver selections made on the **same browser and
+domain** are imported when an admin opens the app after the migration; local
+storage on a different domain cannot be migrated automatically.
+
 ## Shared Schedule directory
 
 **All registered users and admins** appear as team members in Schedule, including their Department tags. The **Primary Admin is deliberately excluded** from the Schedule roster. Ordinary users do not receive everyone's complete staff profile or IHG membership number.
