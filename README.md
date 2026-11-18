@@ -43,7 +43,21 @@ activity-logs migration to attach their triggers.
 
 To activate team visibility for ordinary users, run [supabase/schedule-directory.sql](./supabase/schedule-directory.sql) in Supabase SQL Editor once. This adds a read-only, authenticated, server-checked directory RPC and does not weaken the existing row-level security policies on `staff_profiles`.
 
-Until this migration is run, the site remains usable but a normal user may only see their own account in Schedule. Changes to Schedule status/day entries are still browser-local; the shared directory synchronizes **who appears**, not yet everyone else's manually entered schedule statuses.
+The directory migration synchronizes **who appears**, but does not synchronize
+their daily statuses. To share everyone's Onsite, Offsite, F-Day, Vacation, and
+Other dates, also run [supabase/shared-schedule.sql](./supabase/shared-schedule.sql)
+in the Supabase SQL Editor. This sets up the protected shared schedule table,
+read permissions for all registered staff, and authenticated RPCs that let each
+person edit **only their own dates**.
+
+If this shared-schedule migration is missing, the application displays an explicit
+warning and does **not** claim that a new Schedule edit was saved. Existing
+browser-only schedule entries are preserved and, once the SQL is installed,
+are imported into the shared table for the signed-in user on page refresh.
+Conflicting shared entries are never overwritten. Each person should sign in
+on the browser where they made their previous local edits, then reload once
+to import their dates. Other users can then reload or refocus the site to see
+the synchronized schedule. The Primary Admin remains excluded from the roster.
 
 ## Department tags
 
