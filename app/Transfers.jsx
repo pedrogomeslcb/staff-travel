@@ -9,6 +9,7 @@ import Dialog from './Dialog';
 
 const input='w-full border border-slate-300 rounded-lg p-2.5 bg-white text-sm text-slate-800';
 const routes={arrival:'Airport → hotel',return:'Hotel → airport'};
+const visibleHotel=value=>value==='InterContinental '+'Luanda Miramar'?'':value;
 const personLabel=n=>`${n} ${n===1?'person':'people'}`;
 const seatLabel=n=>`${n} ${n===1?'seat':'seats'}`;
 const weekday=date=>new Date(date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'});
@@ -29,7 +30,7 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-slate-800">{route}</span>
             <span className="block text-xs text-slate-600">
-              {flight}{group.airport&&' · '+group.airport}{!arrival&&group.hotel&&' · '+group.hotel}
+              {flight}{group.airport&&' · '+group.airport}{!arrival&&visibleHotel(group.hotel)&&' · '+visibleHotel(group.hotel)}
             </span>
           </span>
         </button>
@@ -69,7 +70,7 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
             return <li key={entry.key} className={'flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 '+(transfer.status==='canceled'?'opacity-60':'')}>
               <div className="min-w-28 flex-1">
                 <p className="break-words text-sm font-semibold text-slate-800">{entry.trip.person}</p>
-                <p className="text-xs text-slate-500"><span className="font-medium text-slate-700">{entry.flight||'Flight to confirm'}</span>{arrival&&entry.hotel&&' · '+entry.hotel}</p>
+                <p className="text-xs text-slate-500"><span className="font-medium text-slate-700">{entry.flight||'Flight to confirm'}</span>{arrival&&visibleHotel(entry.hotel)&&' · '+visibleHotel(entry.hotel)}</p>
               </div>
               <div>
                 <span className={'inline-block rounded-full px-2 py-1 text-xs '+(transfer.needsReview?'bg-amber-50 text-amber-800':status[2])}>{transfer.needsReview?'Review required':status[1]}</span>
@@ -85,7 +86,7 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
   </article>;
 }
 
-export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate}) {
+export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate,passengersShared=true}) {
   const [editing,setEditing]=useState(null),[allocation,setAllocation]=useState(null),[error,setError]=useState('');
   const [direction,setDirection]=useState('all'),[period,setPeriod]=useState('upcoming'),[includeCanceled,setIncludeCanceled]=useState(false);
   const [expandedDays,setExpandedDays]=useState({}),[expandedSlots,setExpandedSlots]=useState({});
@@ -156,7 +157,8 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
       </div>
       <p className="text-xs text-slate-500">Local times. Arrivals follow the flight and returns use the scheduled hotel pickup time.</p>
     </section>
-    {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {!passengersShared&&user.role!=='admin'&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Shared passenger details are not enabled yet. An admin must run supabase/transfer-copassengers.sql in Supabase SQL Editor.</p>}
+    {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
     {!plan.days.length&&<div className="bg-white border rounded-xl p-10 text-center"><p className="font-medium text-slate-700">{trips.length?'No transfers match these filters.':'No transfers yet.'}</p><p className="text-sm text-slate-500 mt-2">{trips.length?'Try All dates or another transfer direction.':'Create a hotel request to add arrival and return transfers.'}</p>{trips.length>0&&<button className="text-sm text-blue-700 mt-4" onClick={()=>{setPeriod('all');setDirection('all');setIncludeCanceled(true);}}>Show all transfers</button>}</div>}
     <div className="space-y-3" aria-label="Transfers by day">
       {plan.days.map((day,index)=>{
@@ -193,7 +195,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
       <div className="flex gap-3"><button disabled={busy} className="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2.5 text-sm disabled:opacity-50">{busy?'Saving…':'Save status'}</button><button disabled={busy} type="button" className="px-3 text-sm" onClick={close}>Cancel</button></div>
     </form></Dialog>}
     {allocation&&isAdmin&&<Dialog title="Assign drivers" onClose={close} wide><form onSubmit={saveAllocation} className="p-6 space-y-4">
-      <p className="text-sm text-slate-700">{display(allocation.group.date)} · {allocation.group.time} · {routes[allocation.group.leg]} · {allocation.group.airport}{allocation.group.leg==='return'&&' · '+allocation.group.hotel}</p>
+      <p className="text-sm text-slate-700">{display(allocation.group.date)} · {allocation.group.time} · {routes[allocation.group.leg]} · {allocation.group.airport}{allocation.group.leg==='return'&&visibleHotel(allocation.group.hotel)&&' · '+visibleHotel(allocation.group.hotel)}</p>
       <fieldset className="space-y-2">
         <legend className="mb-2 text-sm font-medium">{multiple?'Select one or more drivers':'Select one driver'}</legend>
         {!multiple&&<label className="flex items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name="drivers" checked={!allocation.driverIds.length} onChange={()=>setAllocation(previous=>({...previous,driverIds:[]}))}/>Unassigned</label>}
