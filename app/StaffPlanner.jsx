@@ -277,6 +277,11 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const date=(label,key)=><DateField label={label} value={trip[key]} onChange={v=>change(key,v)}/>;
   const time=(label,key)=><TimeField label={label} value={trip[key]} onChange={v=>change(key,v)}/>;
   const nights=nightsBetween(trip.checkin,trip.checkout);
+  const eligiblePickupOptions=pickupOptions.filter(option=>{
+    const pickupDate=parse(trip.pickupDate),departure=parse(trip.returnDate),arrival=parse(trip.outDate);
+    return pickupDate&&(!departure||!trip.returnTime||(pickupDate+'T'+option.time<departure+'T'+trip.returnTime))&&
+      (!arrival||!trip.outTime||(pickupDate+'T'+option.time>arrival+'T'+trip.outTime));
+  });
   const usersAccess=user?.role==='admin'&&(connected
     ?<SupabaseUsersAccess client={supabaseClient} currentUser={user} onChange={()=>refresh()}/>
     :<UsersAccess users={users} tags={tags} currentUser={user} shared={shared} busy={busy} onAction={accessAction}/>);
@@ -341,14 +346,10 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       {field('Hotel loyalty number (optional)','membership',false)}{connected&&<p className="text-xs text-slate-500">Your saved IHG number is filled automatically. When IHG synchronization is enabled, entering a number in your own hotel request also updates Database → IHG.</p>}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><p className="text-xs text-slate-500 mb-3">Enter the flight and airport details from your itinerary. All fields remain editable.</p><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','outFlight')}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{field('Flight number','returnFlight')}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div>
       {connected&&pickupOptionsLoading&&<p role="status" className="mt-3 text-xs text-slate-600">Checking existing transfers for this pickup date…</p>}
       {connected&&pickupOptionsError&&<p className="mt-3 text-xs text-amber-800">{pickupOptionsError} You may still enter your pickup time manually.</p>}
-      {connected&&pickupOptions.length>0&&<div className="mt-4 space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3" role="group" aria-label="Existing hotel pickups">
+      {connected&&eligiblePickupOptions.length>0&&<div className="mt-4 space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3" role="group" aria-label="Existing hotel pickups">
         <p className="text-sm font-semibold text-blue-900">Join an existing hotel → airport transfer?</p>
         <p className="text-xs text-slate-600">Other team members have a pickup at this hotel, on this date, going to the same airport. Choose an existing time if it also suits your return flight.</p>
-        {pickupOptions.filter(option=>{
-          const departure=parse(trip.returnDate),arrival=parse(trip.outDate);
-          return (!departure||!trip.returnTime||(parse(trip.pickupDate)+'T'+option.time<departure+'T'+trip.returnTime))&&
-            (!arrival||!trip.outTime||(parse(trip.pickupDate)+'T'+option.time>arrival+'T'+trip.outTime));
-        }).map(option=>{
+        {eligiblePickupOptions.map(option=>{
           const assigned=(option.driverIds||[]).map(id=>(references?.drivers?.length?references.drivers:DRIVERS).find(driver=>driver.id===id)).filter(Boolean);
           const driversText=assigned.length
             ?assigned.map(driver=>driver.name+(driver.licensePlate?' · '+driver.licensePlate:'')).join(' / ')
