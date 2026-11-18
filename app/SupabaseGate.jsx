@@ -83,13 +83,8 @@ export default function SupabaseGate() {
   async function register(event) {
     event.preventDefault();
     setError('');setNotice('');
-    const username=loginName.trim().toLowerCase();
-    if(username.includes('@')){setError('Choose a username without @.');return;}
-    if(['admin','root','system','support'].includes(username)){setError('This username is reserved. Choose another.');return;}
-    if(!/^[a-z0-9][a-z0-9._-]{1,31}$/.test(username)) {
-      setError('Username must be 2–32 characters using letters, digits, dots, _ or -.');return;
-    }
-    if(fullName.trim().length<2){setError('Enter your full name.');return;}
+    const username=generatedUsername.toLowerCase();
+    if(!username){setError('Enter your first and last name to generate a username.');return;}
     if(password.length<6){setError('Choose a password with at least 6 characters.');return;}
     if(password!==confirmPassword){setError('Passwords do not match.');return;}
     if(!teamCode.trim()){setError('Enter the team access code.');return;}
