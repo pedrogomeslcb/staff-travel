@@ -7,13 +7,14 @@ import {WEEKEND_COLOR,dampMonthScroll,schedulePeople,timelineLayout,timelineMont
 import {tagTextColor} from '../lib/accounts.mjs';
 import {summarizeSchedule} from '../lib/schedule-totals.mjs';
 import {Popover,PopoverTrigger,PopoverContent} from '@/components/ui/popover';
+import CountryDays from './CountryDays';
 import ScheduleTotals from './ScheduleTotals';
 import ScheduleDay from './ScheduleDay';
 
 const todayColumnEdge='inset 1px 0 #BFDBFE, inset -1px 0 #BFDBFE';
 const initialRange=anchor=>({start:new Date(anchor.getFullYear(),anchor.getMonth()-1,1),count:6,anchor:iso(anchor)});
 
-export default function Schedule({month,setMonth,people,trips,tags=[],presence=trips||[],schedule,user,ready,busy,onEdit,onChange,onUndo,sectorLabel='Sector',allowTeamEdit=false}) {
+export default function Schedule({countryTrips,countryLimited,month,setMonth,people,trips,tags=[],presence=trips||[],schedule,user,ready,busy,onEdit,onChange,onUndo,sectorLabel='Sector',allowTeamEdit=false}) {
   const today=iso(new Date());
   const [range,setRange]=useState(()=>initialRange(month));
   const [viewportWidth,setViewportWidth]=useState(0);
@@ -366,7 +367,7 @@ export default function Schedule({month,setMonth,people,trips,tags=[],presence=t
       {selectedDates.length>0&&<span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium">{display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>}
       {selectionMessage&&<span role="status">{selectionMessage}</span>}
     </div>}
-  </section><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
+  </section><CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} trips={countryTrips} period={period} limited={countryLimited}/><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}
   </div>;
 }

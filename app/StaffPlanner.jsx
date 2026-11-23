@@ -15,6 +15,7 @@ import Transfers from './Transfers';
 import {DRIVERS} from '../lib/transfers.mjs';
 import UsersAccess from './UsersAccess';
 import TravelAudit from './TravelAudit';
+import AdminNotificationEmail from './AdminNotificationEmail';
 import Database from './Database';
 
 const input='w-full border border-slate-300 rounded-lg p-2.5 bg-white text-sm text-slate-800';
@@ -100,11 +101,13 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [tags,setTags]=useState([]),[users,setUsers]=useState([]),[presence,setPresence]=useState([]),[transferTrips,setTransferTrips]=useState([]);
   const [transferAllocations,setTransferAllocations]=useState({});
   const [transferPassengersReady,setTransferPassengersReady]=useState(!connected);
+  const [countryTrips,setCountryTrips]=useState([]),[countryLimited,setCountryLimited]=useState(false);
   const [references,setReferences]=useState(null);
   const [pickupOptions,setPickupOptions]=useState([]),[pickupOptionsError,setPickupOptionsError]=useState('');
   const [pickupOptionsLoading,setPickupOptionsLoading]=useState(false),[pickupLookupDone,setPickupLookupDone]=useState(false),[joinedPickupTime,setJoinedPickupTime]=useState('');
   function applySnapshot(snapshot) {
     if(userRef.current?.id!==snapshot.currentUser?.id) scheduleHistory.current=[];
+    setCountryTrips(snapshot.countryTrips??snapshot.presence??snapshot.trips);setCountryLimited(!!snapshot.countryLimited);
     setPeople(snapshot.people);setTrips(snapshot.trips);setSchedule(snapshot.schedule);setTags(snapshot.tags||[]);setUsers(snapshot.users||[]);setPresence(snapshot.presence||[]);setTransferTrips(snapshot.transferTrips||[]);
     if(connected)setSharedScheduleReady(snapshot.sharedScheduleReady===true);
     setTransferAllocations(snapshot.transferAllocations||{});
@@ -171,6 +174,18 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       if(action==='saveTag')await repo.saveTag(userRef.current,payload.draft);
       await refreshSaved();setMessage('Access settings saved.');
     }finally{saving.current=false;setBusy(false);}
+  }
+  async function exportExcel(){
+    await mutate(async()=>{
+      const snapshot=await repo.snapshot(user);
+      const admin=snapshot.currentUser.role==='admin';
+      const [db,events,module]=await Promise.all([
+        admin&&database?database.read():null,
+        admin?repo.audit(user,{all:true}):[],
+        import('../lib/export-workbook.mjs'),
+      ]);
+      await module.downloadWorkbook(snapshot,{database:db,events,year:month.getFullYear(),drivers:references?.drivers});
+    });
   }
   function change(key,value) {setTrip(p=>changeTrip(p,key,value,references?.flights));}
   function open(record) {setEditing(record?.id??null);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:old.membership||data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
@@ -305,7 +320,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     ?<SupabaseUsersAccess client={supabaseClient} currentUser={user} onChange={()=>refresh()}/>
     :<UsersAccess users={users} tags={tags} currentUser={user} shared={shared} busy={busy} onAction={accessAction}/>);
   if(!user)return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><form onSubmit={login} className="bg-white border rounded-2xl p-8 w-full max-w-md space-y-5 shadow-sm"><h1 className="text-2xl font-bold text-blue-900">Staff & Travel</h1><p className="text-sm text-slate-500">Team planning and travel workspace</p><label className="block text-sm">Full name<input required readOnly={shared} autoComplete="username" maxLength={120} className={input+' mt-1'} value={name} onChange={e=>setName(e.target.value)}/></label><label className="block text-sm">Password<input required type="password" autoComplete="current-password" maxLength={128} className={input+' mt-1'} value={password} onChange={e=>setPassword(e.target.value)}/></label><button disabled={!ready||busy} className={button+' w-full'}>{!ready?'Preparing accounts…':busy?'Signing in…':'Sign in'}</button>{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}<p className="text-xs text-slate-500">Accounts start with the temporary password <strong>test</strong>, unless an admin has changed it.</p>{!shared&&<p className="text-xs bg-amber-50 p-3 rounded text-amber-900">Local demo only. For initial admin access, use admin / test. Password and access controls are for testing; data stays in this browser. Use fictional data. No bookings or emails are sent.</p>}</form></div>;
-  return <div className="min-h-screen bg-slate-50 text-slate-800"><header className="bg-white border-b p-5 flex flex-wrap gap-4 justify-between"><h1 className="text-xl font-bold text-blue-900">Staff & Travel</h1><div className="flex gap-4 items-center text-sm"><span>{user.name} · {user.role==='admin'?'Admin':'User'}</span><button disabled={busy} onClick={logout}>Sign out</button></div></header>{!connected&&<p className="bg-amber-50 text-amber-900 text-xs px-6 py-2">{shared?'Team workspace · Use local times for each location · No bookings or emails are sent':'Local demo only · Data stays in this browser · Passwords and permissions are for testing'}</p>}<main className={'mx-auto p-4 sm:p-6 '+(tab==='planner'?'max-w-[112rem]':'max-w-6xl')}><div className="flex flex-wrap justify-between gap-4 mb-6"><nav className="flex flex-wrap gap-2" aria-label="Workspace sections">{[['planner','Schedule'],['travel','Hotel & flights'],['transport','Transfers'],...(user.role==='admin'?[['access',database?'Database':'Users & access'],['audit','Logs']]:[])].map(([key,label])=><button key={key} onClick={()=>{setTab(key);setError('');}} aria-current={tab===key?'page':undefined} className={'rounded-xl px-4 py-3 text-sm '+(tab===key?'bg-white shadow text-blue-700':'text-slate-500')}>{label}</button>)}</nav>{!['planner','access','audit'].includes(tab)&&<button disabled={!ready} className={button} onClick={()=>open(null)}>Request hotel stay</button>}</div>{connected&&ready&&tab==='planner'&&!sharedScheduleReady&&<p role="alert" className="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm mb-4">
+  return <div className="min-h-screen bg-slate-50 text-slate-800"><header className="bg-white border-b p-5 flex flex-wrap gap-4 justify-between"><h1 className="text-xl font-bold text-blue-900">Staff & Travel</h1><div className="flex gap-4 items-center text-sm"><button disabled={!ready||busy} onClick={exportExcel} className="text-blue-700">Export to Excel</button><span>{user.name} · {user.role==='admin'?'Admin':'User'}</span><button disabled={busy} onClick={logout}>Sign out</button></div></header>{!connected&&<p className="bg-amber-50 text-amber-900 text-xs px-6 py-2">{shared?'Team workspace · Use local times for each location · No bookings or emails are sent':'Local demo only · Data stays in this browser · Passwords and permissions are for testing'}</p>}<main className={'mx-auto p-4 sm:p-6 '+(tab==='planner'?'max-w-[112rem]':'max-w-6xl')}><div className="flex flex-wrap justify-between gap-4 mb-6"><nav className="flex flex-wrap gap-2" aria-label="Workspace sections">{[['planner','Schedule'],['travel','Hotel & flights'],['transport','Transfers'],...(user.role==='admin'?[['access',database?'Database':'Users & access'],['audit','Logs']]:[])].map(([key,label])=><button key={key} onClick={()=>{setTab(key);setError('');}} aria-current={tab===key?'page':undefined} className={'rounded-xl px-4 py-3 text-sm '+(tab===key?'bg-white shadow text-blue-700':'text-slate-500')}>{label}</button>)}</nav>{!['planner','access','audit'].includes(tab)&&<button disabled={!ready} className={button} onClick={()=>open(null)}>Request hotel stay</button>}</div>{connected&&ready&&tab==='planner'&&!sharedScheduleReady&&<p role="alert" className="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm mb-4">
         Team Schedule is not synchronized. The dates currently visible may be saved only in this browser and cannot be seen by teammates. An administrator must run <a className="underline font-medium" target="_blank" rel="noopener noreferrer" href="https://github.com/pedrogomeslcb/staff-travel/blob/main/supabase/shared-schedule.sql">shared-schedule.sql</a> in the Supabase SQL Editor, then reload. Existing local dates in this browser will be imported without overwriting shared entries.
       </p>}{message&&<p role="status" className="bg-blue-50 p-3 rounded-lg text-sm mb-4">{message}</p>}{error&&!modal&&!scheduleEdit&&!scheduleWarning&&!removing&&<p role="alert" className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">{error}</p>}{!ready&&<p className="text-sm text-slate-500">Loading workspace…</p>}
 
@@ -313,7 +328,8 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
 
     {tab==='transport'&&<Transfers trips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} user={user} busy={busy} onSave={saveTransfer} onAllocate={saveDrivers} passengersShared={transferPassengersReady}/>}
 
-    {tab==='planner'&&<Schedule month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} allowTeamEdit={connected} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={(changes,targetUserId)=>saveSchedule(()=>changes,{targetUserId})} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
+    {tab==='planner'&&<Schedule countryTrips={countryTrips} countryLimited={countryLimited} month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} allowTeamEdit={connected} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={(changes,targetUserId)=>saveSchedule(()=>changes,{targetUserId})} onUndo={scheduleEdit||scheduleWarning?undefined:undoSchedule}/>}
+    {tab==='access'&&connected&&user.role==='admin'&&<AdminNotificationEmail client={supabaseClient}/>}
     {tab==='access'&&user.role==='admin'&&(database?<Database database={database} shared={shared||connected} trips={trips} onReferences={setReferences}>{usersAccess}</Database>:usersAccess)}
     {tab==='audit'&&user.role==='admin'&&<TravelAudit repo={repo} user={user} trips={trips} shared={shared||connected} connected={connected}/>}
   </main>
