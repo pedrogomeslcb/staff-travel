@@ -94,12 +94,6 @@ export default function Database({database,shared,trips,onReferences,children}) 
             aria-label={'Edit '+row[columns[0][0]]} disabled={loading||!!loadError} onClick={()=>open(row)}>Edit</button></td>
         </tr>)}</tbody>
       </table>{!rows.length&&!loading&&<p className="p-4 text-sm text-slate-600">No entries yet.</p>}
-      {linked&&section==='memberships'&&!!catalog.legacyMemberships?.length&&<div className="border-t bg-slate-50 p-4">
-        <p className="text-xs font-medium text-slate-700">Legacy IHG records not yet linked to usernames</p>
-        <p className="my-2 text-xs text-slate-500">These original records are preserved. To link one, select Edit for its registered username above and enter its IHG number.</p>
-        <div className="flex flex-wrap gap-2">{catalog.legacyMemberships.map(x=><span key={x.staff_code}
-          className="rounded-lg border bg-white px-3 py-2 text-xs text-slate-700">{x.staff_code}: {x.membership}</span>)}</div>
-      </div>}
       </div>}
     </section>}
     {editor&&<Dialog title={editor.id?'Edit database entry':'Add database entry'} onClose={()=>{if(!saving)setEditor(null);}} wide>
