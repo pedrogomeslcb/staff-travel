@@ -221,7 +221,7 @@ do $$
 begin
   if to_regclass('public.staff_hotel_requests') is not null then
     execute 'drop trigger if exists staff_hotel_audit on public.staff_hotel_requests';
-    execute 'create trigger staff_hotel_audit after insert or update on public.staff_hotel_requests for each row execute function public.staff_log_hotel_activity()';
+    execute 'create trigger staff_hotel_audit after insert or update on public.staff_hotel_requests for each row when (not (new.record ? ''archivedAt'')) execute function public.staff_log_hotel_activity()';
   end if;
   if to_regclass('public.staff_schedule_entries') is not null then
     execute 'drop trigger if exists staff_schedule_audit on public.staff_schedule_entries';

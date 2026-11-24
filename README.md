@@ -208,3 +208,12 @@ To enable automatic mail in the connected Supabase project:
 4. To inspect recent hotel notifications, run `supabase/check-hotel-email.sql`.
    The worker runs every minute and retries failed submissions up to eight times.
    Provider acceptance is recorded separately from inbox delivery.
+
+### Hotel trip archive
+
+Run `supabase/trip-archive.sql` in Supabase SQL Editor after the hotel, shared
+transfer and activity log migrations. Open **Hotel & flights → Trip archive**
+as an administrator. Download the eligible trips, save the JSON file, and
+confirm to replace full records with summaries. A changed snapshot requires a
+new download. Use **Hotel request status → Archived** to find summaries.
+**Import archive** opens a saved JSON file locally in read-only mode.
