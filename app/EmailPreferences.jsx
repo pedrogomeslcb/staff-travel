@@ -1,6 +1,13 @@
 import {useEffect,useState} from 'react';
 import Dialog from './Dialog';
 
+export function EmailFields({draft,setDraft,role,personal=false,requiredEmail=false}){
+  return <><label className="block">Notification email<input type="email" maxLength={254} value={draft.email} required={requiredEmail&&(role==='admin'||draft.hotel||draft.transfer)}
+          onChange={e=>setDraft({...draft,email:e.target.value})} className="mt-1 block w-full border rounded p-2"/></label>
+          {role==='admin'?<p>Administrators receive all workspace activity alerts.</p>:<fieldset className="space-y-2"><legend>Updates about {personal?'your':'this user’s'} requests</legend>
+            {[['hotel','Hotel'],['transfer','Transfers']].map(([key,label])=><label className="block" key={key}><input type="checkbox" checked={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.checked})}/> {label}</label>)}</fieldset>}</>;
+}
+
 export default function EmailPreferences({client,id,role,name,personal=false}){
   const [open,setOpen]=useState(false),[first,setFirst]=useState(false);
   const [draft,setDraft]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -37,10 +44,7 @@ export default function EmailPreferences({client,id,role,name,personal=false}){
     {open&&<Dialog title={personal?'Email preferences':'Email preferences · '+name} onClose={close}>
       <form className="p-5 space-y-4 text-sm" onSubmit={e=>{e.preventDefault();void save(false);}}>
         {error&&<p role="alert" className="text-red-700">{error}</p>}
-        {draft?<><label className="block">Notification email<input type="email" maxLength={254} value={draft.email} required={role==='admin'||draft.hotel||draft.transfer}
-          onChange={e=>setDraft({...draft,email:e.target.value})} className="mt-1 block w-full border rounded p-2"/></label>
-          {role==='admin'?<p>Administrators receive all workspace activity alerts.</p>:<fieldset className="space-y-2"><legend>Updates about {personal?'your':'this user’s'} requests</legend>
-            {[['hotel','Hotel'],['transfer','Transfers']].map(([key,label])=><label className="block" key={key}><input type="checkbox" checked={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.checked})}/> {label}</label>)}</fieldset>}
+        {draft?<><EmailFields {...{draft,setDraft,role,personal}} requiredEmail/>
           <div className="flex flex-wrap gap-4"><button disabled={busy} className="text-blue-700">Save preferences</button>
           {role!=='admin'&&<button type="button" disabled={busy} onClick={()=>save(true)}>{personal?'No email updates':'Disable updates'}</button>}</div>
         </>:!error&&<p role="status">Loading preferences…</p>}
