@@ -203,13 +203,8 @@ To enable automatic mail in the connected Supabase project:
    `supabase/admin-request-email.sql`. Rerun this migration to upgrade an existing email installation.
 2. In Supabase Vault add `staff_resend_api_key` (a Resend sending key) and
    `staff_email_from` (a verified sender). Keep both server-side.
-3. Admins set their mailbox under **Email preferences** beside their name and receive
-   every new activity log event. Users can opt into their own hotel or transfer updates
-   on first sign-in, decline with the close button, or change preferences later.
-   Admins can edit a user's preferences in **Database → Users & access**.
-4. After an authorized request change, check the admin inbox and the provider
-   delivery log. Supabase Cron dispatches every minute. In SQL Editor, inspect
-   `select event_id, user_id, attempts, last_status, delivered_at from staff_mail.outbox order by event_id desc;`.
-   A delivery timestamp means the mail provider accepted the message. Failed
-   requests retry up to eight times. Correct the configuration before requeuing
-   failed events. The worker checks the current role and subscriptions before dispatch.
+3. Store the primary administrator's recipient address in Vault as `staff_email_to`.
+   Every logged event has one queue entry. The destination is managed exclusively in Vault.
+4. To inspect recent hotel notifications, run `supabase/check-hotel-email.sql`.
+   The worker runs every minute and retries failed submissions up to eight times.
+   Provider acceptance is recorded separately from inbox delivery.

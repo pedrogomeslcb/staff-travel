@@ -1,5 +1,4 @@
 import React,{useCallback,useEffect,useState} from 'react';
-import {EmailFields} from './EmailPreferences';
 import Dialog from './Dialog';
 
 const input='mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm';
@@ -46,24 +45,16 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
   const mayEditRole=person=>!protectedAccount(person);
   const mayResetPassword=person=>isPrimary&&!person.is_primary_admin;
 
-  const mayEditEmail=person=>person.role!=='admin'||isPrimary||person.user_id===currentUser.id;
   function open(person){
     setEditor({
       person,
       ihgMembership:person.ihgMembership||'',
       department:person.department||'',
       role:person.role,
-      newPassword:'',mail:null,originalMail:null,mailError:'',
+      newPassword:'',
     });
     setError('');
     setNotice('');
-    if(mayEditEmail(person)){
-      client.rpc('staff_get_mail_preferences',{target:person.user_id}).then(({data,error})=>{
-        setEditor(previous=>previous?.person===person?{...previous,mail:data,originalMail:data,mailError:error?.message||''}:previous);
-      }).catch(err=>{
-        setEditor(previous=>previous?.person===person?{...previous,mailError:err.message}:previous);
-      });
-    }
   }
   function updateEditor(field,value){
     setEditor(previous=>({...previous,[field]:value}));
@@ -95,12 +86,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     if(onChange)await onChange();
   }
 
-  async function saveEmail(id,mail){
-    const {error}=await client.rpc('staff_save_mail_preferences',{target:id,address:mail.email.trim(),
-      hotel_updates:mail.hotel,transfer_updates:mail.transfer});
-    if(error)throw error;
-  }
-
   async function save(event){
     event.preventDefault();
     if(busy||!editor)return;
@@ -112,8 +97,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
     const roleChanged=mayEditRole(person)&&editor.role!==person.role;
     const passwordChanged=mayResetPassword(person)&&newPassword.length>0;
 
-    const mail=editor.mail, original=editor.originalMail;
-    const mailChanged=mail && (mail.email.trim()!==original.email || mail.hotel!==original.hotel || mail.transfer!==original.transfer);
     if(ihgMembership.length>64){
       setError('IHG membership may have at most 64 characters.');
       return;
@@ -122,7 +105,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
       setError('A new password must contain between 6 and 128 characters.');
       return;
     }
-    if(!ihgChanged&&!departmentChanged&&!roleChanged&&!passwordChanged&&!mailChanged){
+    if(!ihgChanged&&!departmentChanged&&!roleChanged&&!passwordChanged){
       setNotice('No changes to save.');
       setEditor(null);
       return;
@@ -147,16 +130,8 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
         if(membershipError)throw membershipError;
         completed++;
       }
-      if(mailChanged && (!roleChanged || editor.role==='admin')){
-        await saveEmail(person.user_id,mail);
-        completed++;
-      }
       if(roleChanged){
         await adminAction('set_role',person.user_id,{role:editor.role});
-        completed++;
-      }
-      if(mailChanged && roleChanged && editor.role==='user'){
-        await saveEmail(person.user_id,mail);
         completed++;
       }
       if(passwordChanged){
@@ -276,12 +251,6 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
               onChange={e=>updateEditor('newPassword',e.target.value)}/>
           </label>}
         </div>
-        {mayEditEmail(editor.person)&&<fieldset className="space-y-2 border-t pt-4 text-sm" disabled={busy}>
-          <legend className="font-semibold">Email preferences</legend>
-          {editor.mail?<EmailFields draft={editor.mail} setDraft={value=>updateEditor('mail',value)} role={editor.role}
-            requiredEmail={editor.mail.email!==editor.originalMail.email||editor.mail.hotel!==editor.originalMail.hotel||editor.mail.transfer!==editor.originalMail.transfer}/>
-            :<p role="status">{editor.mailError||'Loading preferences…'}</p>}
-        </fieldset>}
         {editor.person.is_primary_admin&&<p className="text-xs text-slate-500">
           The primary admin account is protected: its role and access cannot be changed here.
         </p>}
