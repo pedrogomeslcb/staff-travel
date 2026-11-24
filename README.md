@@ -194,7 +194,7 @@ Schedule panel and the workbook include future active itineraries in the
 calendar-year projection. Before installation, administrators can use their
 visible reservations and ordinary users see their own flight totals.
 
-**Export to Excel** downloads the current account's visible workspace, across
+Only administrators see **Export to Excel** and can download the workspace across
 all dates. Administrators also receive the database directories, users and logs.
 
 To enable automatic mail in the connected Supabase project:

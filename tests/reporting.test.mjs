@@ -16,15 +16,14 @@ test('Excel round trip keeps permissions, text identifiers and separate weekday 
   const person={id:'p',name:'Traveler'};
   const trip=stay('2026-11-20','2026-11-23',{id:'t',person:'Traveler',checkin:'2026-11-20',checkout:'2026-11-23',membership:'000123'});
   const snapshot={currentUser:{...person,role:'user'},people:[person],presence:[trip],schedule:{},trips:[trip],transferTrips:[trip],tags:[],users:[person]};
-  for(const role of ['user','admin']){
-    snapshot.currentUser.role=role;
-    const book=new ExcelJS.Workbook();
-    await book.xlsx.load(await plannerWorkbook(snapshot,{year:2026}).xlsx.writeBuffer());
-    assert.equal(book.getWorksheet('Schedule').rowCount,3);
-    assert.equal(book.getWorksheet('Days in country').getCell('M2').value,4);
-    assert.equal(book.getWorksheet('Hotel and flights').getCell('H2').value,'000123');
-    assert.equal(book.getWorksheet('Transfers').rowCount,3);
-    assert.equal(!!book.getWorksheet('Logs'),role==='admin');
-    assert.equal(!!book.getWorksheet('Users and access'),role==='admin');
-  }
+  assert.throws(()=>plannerWorkbook(snapshot),/Administrator access required/);
+  snapshot.currentUser.role='admin';
+  const book=new ExcelJS.Workbook();
+  await book.xlsx.load(await plannerWorkbook(snapshot,{year:2026}).xlsx.writeBuffer());
+  assert.equal(book.getWorksheet('Schedule').rowCount,3);
+  assert.equal(book.getWorksheet('Days in country').getCell('M2').value,4);
+  assert.equal(book.getWorksheet('Hotel and flights').getCell('H2').value,'000123');
+  assert.equal(book.getWorksheet('Transfers').rowCount,3);
+  assert.equal(!!book.getWorksheet('Logs'),true);
+  assert.equal(!!book.getWorksheet('Users and access'),true);
 });
