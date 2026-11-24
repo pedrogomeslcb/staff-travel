@@ -105,9 +105,9 @@ drop policy if exists hotel_insert on public.staff_hotel_requests;
 create policy hotel_insert on public.staff_hotel_requests
 for insert to authenticated
 with check (
-  owner_user_id = (select auth.uid())
+  (owner_user_id = (select auth.uid()) or (select public.is_staff_admin()))
   and exists (select 1 from public.staff_profiles p
-    where p.user_id = (select auth.uid()) and p.role in ('admin','user'))
+    where p.user_id = owner_user_id and p.role in ('admin','user'))
 );
 
 drop policy if exists hotel_update on public.staff_hotel_requests;
@@ -133,7 +133,7 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
-    if new.owner_user_id is distinct from actor or new.revision <> 1
+    if (new.owner_user_id is distinct from actor and not actor_is_admin) or new.revision <> 1
        or (new.record->>'hotelRequested') = 'true'
        or coalesce(new.record->>'confirmationNumber','') <> '' then
       raise exception 'Invalid initial hotel request';
