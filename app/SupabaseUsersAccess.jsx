@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useState} from 'react';
+import EmailPreferences from './EmailPreferences';
 import Dialog from './Dialog';
 
 const input='mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm';
@@ -205,6 +206,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
           <td className="px-4 py-3">
             <button type="button" className={button} disabled={busy}
               onClick={()=>open(person)}>Edit user</button>
+            {(person.role!=='admin'||isPrimary||person.user_id===currentUser.id)&&<span className="ml-3"><EmailPreferences client={client} id={person.user_id} role={person.role} name={personName(person)}/></span>}
           </td>
         </tr>)}</tbody>
       </table>

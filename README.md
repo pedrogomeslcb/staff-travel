@@ -200,14 +200,16 @@ all dates. Administrators also receive the database directories, users and logs.
 To enable automatic mail in the connected Supabase project:
 
 1. Install the existing activity logs and shared transfer migrations, then run
-   `supabase/admin-request-email.sql`. Only new hotel and transfer events are queued.
+   `supabase/admin-request-email.sql`. Rerun this migration to upgrade an existing email installation.
 2. In Supabase Vault add `staff_resend_api_key` (a Resend sending key) and
    `staff_email_from` (a verified sender). Keep both server-side.
-3. Each administrator signs in and saves their real mailbox under **Database →
-   My email for hotel and transfer alerts**. Pending events wait for an address.
+3. Admins set their mailbox under **Email preferences** beside their name and receive
+   every new activity log event. Users can opt into their own hotel or transfer updates
+   on first sign-in, decline with the close button, or change preferences later.
+   Admins can edit a user's preferences in **Database → Users & access**.
 4. After an authorized request change, check the admin inbox and the provider
    delivery log. Supabase Cron dispatches every minute. In SQL Editor, inspect
    `select event_id, user_id, attempts, last_status, delivered_at from staff_mail.outbox order by event_id desc;`.
    A delivery timestamp means the mail provider accepted the message. Failed
    requests retry up to eight times. Correct the configuration before requeuing
-   failed events. The worker checks the current admin role before dispatch.
+   failed events. The worker checks the current role and subscriptions before dispatch.
