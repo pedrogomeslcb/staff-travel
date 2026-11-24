@@ -95,9 +95,10 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[drafts,setDrafts]=useState({}),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [month,setMonth]=useState(()=>new Date()),[scheduleEdit,setScheduleEdit]=useState(null);
   const [hotelName,setHotelName]=useState('');
+  const [requestUserId,setRequestUserId]=useState(initialUser?.id||'');
   const [scheduleWarning,setScheduleWarning]=useState(null),[hotelFilter,setHotelFilter]=useState('active');
   const [removing,setRemoving]=useState(null),[acknowledgeHotel,setAcknowledgeHotel]=useState(false);
-  const saving=useRef(false),userRef=useRef(initialUser),scheduleHistory=useRef([]);
+  const saving=useRef(false),userRef=useRef(initialUser),scheduleHistory=useRef([]),requestUserIdRef=useRef(initialUser?.id||'');
   userRef.current=user;
   const [tags,setTags]=useState([]),[users,setUsers]=useState([]),[presence,setPresence]=useState([]),[transferTrips,setTransferTrips]=useState([]);
   const [transferAllocations,setTransferAllocations]=useState({});
@@ -120,7 +121,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   function clearSession() {
     scheduleHistory.current=[];
     setTransferAllocations({});setTransferPassengersReady(!connected);
-    setScheduleWarning(null);setHotelFilter('active');setHotelName('');setSharedScheduleReady(!connected);
+    setScheduleWarning(null);setHotelFilter('active');setHotelName('');setRequestUserId('');requestUserIdRef.current='';setSharedScheduleReady(!connected);
     userRef.current=null;setUser(null);setTrips([]);setPeople([]);setSchedule({});setTags([]);setUsers([]);setPresence([]);setTransferTrips([]);setDrafts({});setModal(false);setScheduleEdit(null);setRemoving(null);setTab('planner');
   }
   async function refresh(actor=userRef.current) {const snapshot=await repo.snapshot(actor);applySnapshot(snapshot);}
@@ -190,12 +191,37 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     });
   }
   function change(key,value) {setTrip(p=>changeTrip(p,key,value,references?.flights));}
-  function open(record) {setEditing(record?.id??null);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});setError('');setModal(true);if(connected&&!record)database.references().then(data=>{setReferences(data);setTrip(old=>({...old,membership:old.membership||data.membership||''}));}).catch(e=>setError('Could not load IHG membership: '+e.message));}
+  function selectRequestUser(nextId) {
+    requestUserIdRef.current=nextId;
+    setRequestUserId(nextId);
+    setError('');
+    setTrip(previous=>({...previous,membership:nextId===user.id?(references?.membership||''):''}));
+    if(connected&&nextId!==user.id) {
+      supabaseClient.from('staff_ihg_memberships').select('membership').eq('user_id',nextId).maybeSingle()
+        .then(({data,error})=>{
+          if(error)throw error;
+          if(requestUserIdRef.current===nextId)
+            setTrip(previous=>previous.membership?previous:{...previous,membership:data?.membership||''});
+        })
+        .catch(()=>{if(requestUserIdRef.current===nextId)setError('Could not retrieve the selected team member’s loyalty number. You can enter it manually.');});
+    }
+  }
+  function open(record) {
+    const ownerId=record?.userId??user.id;
+    requestUserIdRef.current=ownerId;setRequestUserId(ownerId);
+    setEditing(record?.id??null);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);
+    setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});
+    setError('');setModal(true);
+    if(connected&&!record)database.references().then(data=>{
+      setReferences(data);
+      if(requestUserIdRef.current===user.id)setTrip(previous=>({...previous,membership:previous.membership||data.membership||''}));
+    }).catch(error=>setError('Could not load IHG membership: '+error.message));
+  }
   async function mutate(action) {if (saving.current) return;saving.current=true;setBusy(true);setError('');try {await action();}catch(e){accessError(e);}finally {saving.current=false;setBusy(false);}}
   function acceptRecord(record) {setTrips(previous=>previous.some(t=>t.id===record.id)?previous.map(t=>t.id===record.id?record:t):[record,...previous]);}
   async function save(e) {
     e.preventDefault();await mutate(async()=>{
-      const result=await repo.save(user,trip,editing);acceptRecord(result.record);setModal(false);
+      const result=await repo.save(user,trip,editing,requestUserId);acceptRecord(result.record);setModal(false);
       if(connected&&result.record.membership) {
         try {setReferences(await database.references());} catch { /* The request was already saved. */ }
       }
@@ -285,6 +311,10 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     if(entry)return saveSchedule(()=>entry.changes,{undo:true,targetUserId:entry.targetUserId});
   }
   const hotelNames=user?.role==='admin'?[...new Set(trips.map(t=>t.person).filter(Boolean))].sort((a,b)=>a.localeCompare(b)):[];
+  const requestUsers=user?.role==='admin'
+    ?[...new Map([user,...users].filter(Boolean).map(person=>[person.id,{id:person.id,name:person.name||person.username||'Staff'}])).values()]
+      .sort((a,b)=>a.name.localeCompare(b.name))
+    :[];
   const visibleTrips=trips.filter(t=>{
     if(user?.role!=='admin')return !t.canceledAt&&t.userId===user?.id;
     if(hotelName && t.person!==hotelName)return false;
@@ -385,7 +415,11 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     </form>
   </Dialog>}
 
-  {modal&&<Dialog wide title={editing!==null?'Edit hotel request':'Request hotel stay'} onClose={()=>!busy&&setModal(false)}><form onSubmit={save} className="p-6 space-y-6"><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location.</p><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{fixed('Full name',editing!==null?trip.person||user.name:user.name)}
+  {modal&&<Dialog wide title={editing!==null?'Edit hotel request':'Request hotel stay'} onClose={()=>!busy&&setModal(false)}><form onSubmit={save} className="p-6 space-y-6"><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location.</p><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{user.role==='admin'&&editing===null
+        ?<label className="block text-xs text-slate-600">Full name<select required className={input+' mt-1'} value={requestUserId} onChange={e=>selectRequestUser(e.target.value)}>
+          {requestUsers.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}
+        </select></label>
+        :fixed('Full name',editing!==null?trip.person||user.name:user.name)}
       {field('Hotel loyalty number (optional)','membership',false)}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','outFlight',arrivalOptions)}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','returnFlight',departureOptions)}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div>
       {connected&&parse(trip.pickupDate)&&!trip.returnOrigin.trim()&&<p className="mt-3 text-xs text-slate-600">Enter the return-flight departure airport above to find existing transfers for this date.</p>}
       {connected&&pickupOptionsLoading&&<p role="status" className="mt-3 text-xs text-slate-600">Checking existing transfers for this pickup date…</p>}
