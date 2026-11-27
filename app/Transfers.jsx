@@ -1,89 +1,79 @@
 'use client';
 
 import {useId,useState} from 'react';
-import {ChevronRight,X} from 'lucide-react';
+import {ChevronRight,X,Plane,Car,Users,CalendarDays,AlertCircle,CheckCircle2} from 'lucide-react';
 import {display,iso} from '../lib/planner.mjs';
 import {DRIVERS,TRANSFER_STATUSES} from '../lib/transfers.mjs';
-import {buildTransferPlan} from '../lib/transfer-plan.mjs';
+import {buildTransferPlan,transferOverview,transferGroupState} from '../lib/transfer-plan.mjs';
 import Dialog from './Dialog';
 
 const input='w-full border border-slate-300 rounded-lg p-2.5 bg-white text-sm text-slate-800';
 const routes={arrival:'Airport → hotel',return:'Hotel → airport'};
-const visibleHotel=value=>value==='InterContinental '+'Luanda Miramar'?'':value;
+const visibleHotel=value=>value==='InterContinental '+'Luanda Miramar'||String(value??'').trim().toLowerCase()==='not specified'?'':value;
 const personLabel=n=>`${n} ${n===1?'person':'people'}`;
 const seatLabel=n=>`${n} ${n===1?'seat':'seats'}`;
 const weekday=date=>new Date(date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'});
 
+const control='rounded-lg border bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-700 disabled:opacity-50';
+function StatusPill({state}){
+  const tone=state==='attention'?'bg-amber-50 text-amber-900':state==='ready'?'bg-emerald-50 text-emerald-800':'bg-slate-100 text-slate-600';
+  return <span className={'inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium '+tone}>
+    {state==='attention'?<AlertCircle size={13} aria-hidden="true"/>:state==='ready'?<CheckCircle2 size={13} aria-hidden="true"/>:null}
+    {state==='attention'?'Needs attention':state==='ready'?'Arranged':'Closed'}
+  </span>;
+}
 function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,onRemove}) {
   const passengersId=useId();
   const arrival=group.leg==='arrival',route=routes[group.leg];
-  const flight=group.flights.length===1?`Flight ${group.flights[0]}`:group.flights.length>1?`${group.flights.length} flights`:'Flight to confirm';
+  const flight=group.flights.length===1?group.flights[0]:group.flights.length>1?group.flights.length+' flights':'Flight to confirm';
   const canAssign=isAdmin&&group.people>0&&group.assignable;
-  return <article aria-label={`${group.time||'Time to confirm'} · ${route}`}>
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5">
-      <h4 className="min-w-48 flex-1">
-        <button type="button" aria-expanded={expanded} aria-controls={passengersId} onClick={onToggle}
-          className="flex w-full items-center gap-2 rounded-md py-1 text-left hover:bg-slate-50">
-          <ChevronRight aria-hidden="true" className={'size-4 shrink-0 text-slate-500 '+(expanded?'rotate-90':'')}/>
-          <span title={group.time?undefined:'Time to confirm'}
-            className="min-w-12 text-base font-semibold tabular-nums text-slate-900">{group.time||'TBD'}</span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-800">{route}</span>
-            <span className="block text-xs text-slate-600">
-              {flight}{group.airport&&' · '+group.airport}{!arrival&&visibleHotel(group.hotel)&&' · '+visibleHotel(group.hotel)}
-            </span>
-          </span>
-        </button>
-      </h4>
-      <div className="text-xs">
-        <p className="whitespace-nowrap font-medium text-slate-700">{personLabel(group.people||group.totalPeople)}</p>
-        {group.unseated>0?<p className="text-amber-800">{seatLabel(group.unseated)} needed</p>
-          :group.attention>0?<p className="text-amber-800">{group.attention} {group.attention===1?'needs':'need'} attention</p>
-          :!group.people&&<p className="text-slate-500">Completed or canceled</p>}
+  const state=transferGroupState(group);
+  return <article aria-label={(group.time||'Time to confirm')+' · '+route} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="grid gap-3 p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="min-w-0">
+        <h4><button type="button" aria-expanded={expanded} aria-controls={passengersId} onClick={onToggle} className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-blue-700">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-800">{arrival?<Plane size={19} aria-hidden="true"/>:<Car size={19} aria-hidden="true"/>}</span>
+          <span className="min-w-0 flex-1"><span className="block text-lg font-semibold tabular-nums leading-tight text-slate-900">{group.time||'TBD'} <span className="text-sm font-medium text-slate-700">{route}</span></span><span className="mt-1 block break-words text-xs text-slate-500">{[flight,group.airport,!arrival&&visibleHotel(group.hotel)].filter(Boolean).join(' · ')}</span></span>
+          <ChevronRight size={17} aria-hidden="true" className={'shrink-0 text-slate-400 transition-transform '+(expanded?'rotate-90':'')}/>
+        </button></h4>
+        <div className="mt-3 flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"><Users size={14} aria-hidden="true"/>{personLabel(group.people||group.totalPeople)}</span><StatusPill state={state}/>{group.unseated>0&&<span className="text-xs font-medium text-amber-800">{seatLabel(group.unseated)} needed</span>}{!group.unseated&&group.attention>0&&<span className="text-xs text-amber-800">{group.attention} to review</span>}</div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Drivers">
-        {group.drivers.length>0?<ul aria-label="Allocated drivers" className="flex flex-wrap gap-2.5">
-          {group.drivers.map(driver=><li key={driver.id} className="group relative rounded-lg border bg-stone-50 px-2.5 py-1.5 text-slate-600"
-            title={`${driver.name} · ${driver.licensePlate} · ${driver.contact}`}>
-            <p><strong className="text-slate-900">{driver.name}</strong> · {driver.licensePlate}</p>
-            <p>{driver.contact&&(/^[+\d\s().-]+$/.test(driver.contact)?<a className="text-blue-700 underline" href={'tel:'+driver.contact.replace(/[^+\d]/g,'')}>{driver.contact}</a>:driver.contact)} · {group.people?`${driver.passengers.length}/${driver.capacity} seats`:seatLabel(driver.capacity)}</p>
-            {expanded&&group.drivers.length>1&&driver.passengers.length>0&&<p className="mt-1 max-w-48 break-words text-slate-700">{driver.passengers.join(', ')}</p>}
-            {canAssign&&<button type="button" disabled={busy}
-              aria-label={'Remove '+driver.name+' from this transfer'} title={'Remove '+driver.name}
-              className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border bg-white text-slate-500 opacity-0 hover:text-red-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 disabled:opacity-40"
-              onClick={()=>onRemove(group,driver.id)}><X aria-hidden="true" className="size-3"/></button>}
+      <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600"><Car size={14} aria-hidden="true"/>Driver allocation</p>{canAssign&&<button type="button" disabled={busy} className={control+' text-blue-700'} onClick={()=>onAllocate(group)}>{group.drivers.length?'Edit drivers':'Assign drivers'}</button>}</div>
+        {group.drivers.length>0?<ul aria-label="Allocated drivers" className="grid gap-2">
+          {group.drivers.map(driver=><li key={driver.id} className="flex items-start justify-between gap-2 rounded-md border bg-white px-3 py-2">
+            <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-900">{driver.name}{driver.licensePlate&&<span className="ml-2 text-xs font-normal text-slate-500">{driver.licensePlate}</span>}</p>
+              {driver.contact&&<p className="mt-0.5 break-words text-xs text-slate-600">{/^[+\d\s().-]+$/.test(driver.contact)?<a className="text-blue-700 underline" href={'tel:'+driver.contact.replace(/[^+\d]/g,'')}>{driver.contact}</a>:driver.contact}</p>}
+              {expanded&&group.drivers.length>1&&driver.passengers.length>0&&<p className="mt-1 break-words text-xs text-slate-600">{driver.passengers.join(', ')}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2"><div className="w-[4.5rem] text-right"><p className="text-xs font-medium tabular-nums text-slate-700">{group.people?driver.passengers.length+'/'+driver.capacity:driver.capacity} seats</p>{group.people>0&&<div role="img" aria-label={driver.passengers.length+' of '+driver.capacity+' seats allocated'} className="mt-1.5 h-1 rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{width:Math.min(100,driver.passengers.length/Math.max(1,driver.capacity)*100)+'%'}}/></div>}</div>
+            {canAssign&&<button type="button" disabled={busy} aria-label={'Remove '+driver.name+' from this transfer'} title={'Remove '+driver.name} className="grid size-7 place-items-center rounded border text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-40" onClick={()=>onRemove(group,driver.id)}><X size={14} aria-hidden="true"/></button>}</div>
           </li>)}
-        </ul>:group.people>0&&<span className="text-amber-800">Awaiting driver</span>}
+        </ul>:<p className={'text-xs '+(group.people>0?'text-amber-800':'text-slate-500')}>{group.people>0?'Awaiting driver':'No driver allocated'}</p>}
+        {isAdmin&&group.people>0&&!group.assignable&&<p className="mt-2 text-xs text-slate-500">Confirm trip details to assign drivers.</p>}
       </div>
-      {canAssign&&<button type="button" disabled={busy}
-        className="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-        onClick={()=>onAllocate(group)}>Assign drivers</button>}
-      {isAdmin&&group.people>0&&!group.assignable&&<p className="text-xs text-slate-500">Confirm trip details to assign drivers.</p>}
     </div>
-    <div id={passengersId} hidden={!expanded}>
-      {expanded&&<>
-        <ul aria-label="Passengers" className="divide-y border-t">
+    <div className="border-t border-slate-100">
+      <button type="button" aria-expanded={expanded} aria-controls={passengersId} onClick={onToggle} className="flex w-full items-center justify-between gap-2 bg-slate-50/60 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-700"><span>Passenger details</span><span className="inline-flex items-center gap-1 text-blue-700">{expanded?'Hide details':'Show details'}<ChevronRight size={14} aria-hidden="true" className={expanded?'rotate-90':''}/></span></button>
+      <div id={passengersId} hidden={!expanded}>
+        {expanded&&<ul aria-label="Passengers" className="divide-y border-t border-slate-100">
           {group.entries.map(entry=>{
             const {transfer}=entry;
             const statusKey=['to_arrange','assigned'].includes(transfer.status)?(entry.seated?'assigned':'to_arrange'):transfer.status;
             const status=TRANSFER_STATUSES.find(value=>value[0]===statusKey)||TRANSFER_STATUSES[0];
-            return <li key={entry.key} className={'flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 '+(transfer.status==='canceled'?'opacity-60':'')}>
-              <div className="min-w-28 flex-1">
-                <p className="break-words text-sm font-semibold text-slate-800">{entry.trip.person}</p>
-                <p className="text-xs text-slate-500"><span className="font-medium text-slate-700">{entry.flight||'Flight to confirm'}</span>{arrival&&visibleHotel(entry.hotel)&&' · '+visibleHotel(entry.hotel)}</p>
-              </div>
-              <div>
-                <span className={'inline-block rounded-full px-2 py-1 text-xs '+(transfer.needsReview?'bg-amber-50 text-amber-800':status[2])}>{transfer.needsReview?'Review required':statusKey==='to_arrange'?'Awaiting driver':statusKey==='assigned'?'Driver assigned':status[1]}</span>
-                {transfer.needsReview&&<span className="block text-[11px] text-slate-500">Previously: {TRANSFER_STATUSES.find(value=>value[0]===transfer.status)?.[1]||status[1]}</span>}
-              </div>
-              {isAdmin&&<button type="button" disabled={busy} className="rounded-md px-2 py-1.5 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                aria-label={'Edit status: '+entry.trip.person+' · '+route} onClick={()=>onEdit(entry)}>Edit status</button>}
+            return <li key={entry.key} className={'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 '+(transfer.status==='canceled'?'opacity-60':'')}>
+              <div className="flex min-w-32 flex-1 items-start gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600" aria-hidden="true">{String(entry.trip.person||'?').trim().split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase()}</span><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-900">{entry.trip.person}</p><p className="mt-0.5 break-words text-xs text-slate-500">{entry.flight||'Flight to confirm'}{arrival&&visibleHotel(entry.hotel)&&' · '+visibleHotel(entry.hotel)}</p></div></div>
+              <div><span className={'inline-block rounded-md px-2 py-1 text-xs '+(transfer.needsReview?'bg-amber-50 text-amber-800':status[2])}>{transfer.needsReview?'Review required':statusKey==='to_arrange'?'Awaiting driver':statusKey==='assigned'?'Driver assigned':status[1]}</span>{transfer.needsReview&&<span className="mt-0.5 block text-[11px] text-slate-500">Previously: {TRANSFER_STATUSES.find(value=>value[0]===transfer.status)?.[1]||status[1]}</span>}</div>
+              {isAdmin&&<button type="button" disabled={busy} className={control+' text-blue-700'} aria-label={'Edit status: '+entry.trip.person+' · '+route} onClick={()=>onEdit(entry)}>Edit status</button>}
             </li>;
           })}
-        </ul>
-      </>}
+        </ul>}
+      </div>
     </div>
   </article>;
+}
+function Metric({icon:Icon,label,value,attention=false}){
+  return <div className="rounded-lg border border-slate-200 bg-white p-3"><p className="flex items-center gap-2 text-xs font-medium text-slate-600"><Icon size={16} aria-hidden="true"/>{label}</p><p className={'mt-2 text-2xl font-semibold tabular-nums '+(attention&&value>0?'text-amber-800':'text-slate-900')}>{value}</p></div>;
 }
 
 export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate,passengersShared=true,focusKey=null,onClearFocus,onBackToAdmin}) {
@@ -94,6 +84,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
   const today=iso(new Date()),fullPlan=buildTransferPlan(trips,{direction,period,today,includeCanceled,allocations,drivers});
   const focusedGroup=focusKey?fullPlan.days.flatMap(day=>day.groups).find(group=>group.key===focusKey):null;
   const plan=focusKey?(focusedGroup?{days:[{date:focusedGroup.date,groups:[focusedGroup],people:focusedGroup.people,arrivals:focusedGroup.leg==='arrival'?focusedGroup.people:0,pickups:focusedGroup.leg==='return'?focusedGroup.people:0}],people:focusedGroup.people,attention:focusedGroup.attention}:{days:[],people:0,attention:0}):fullPlan;
+  const overview=transferOverview(plan);
   const nearestDay=plan.days.reduce((best,day)=>{
     if(!day.date)return best;
     const distance=Math.abs(Date.parse(day.date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'));
@@ -138,12 +129,12 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
   return <div className="space-y-4">
     {focusKey&&user.role==='admin'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-4 py-3 text-sm"><span>Transfer selected from the Admin dashboard</span><div className="flex gap-3"><button type="button" className="text-blue-700" onClick={onBackToAdmin}>Back to dashboard</button><button type="button" className="text-blue-700" onClick={onClearFocus}>Show all transfers</button></div></div>}
     <section className="space-y-3 rounded-xl border bg-white p-4" aria-label="Transfer plan overview">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-base font-semibold text-slate-900">Transfer plan</h2>
-        <p className="text-xs text-slate-600">
-          {plan.days.length} {plan.days.length===1?'day':'days'} · {personLabel(plan.people)} to transport
-          {plan.attention>0&&<span className="text-amber-800"> · {plan.attention} {plan.attention===1?'transfer needs':'transfers need'} attention</span>}
-        </p>
+      <div><h2 className="text-base font-semibold text-slate-900">Transfer plan</h2><p className="mt-1 text-xs text-slate-500">Airport arrivals and hotel pickups · {focusKey?'Selected transfer':period==='upcoming'?'Upcoming':'All dates'}</p></div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <Metric icon={CalendarDays} label="Transfer days" value={overview.days}/>
+        <Metric icon={Car} label="Active groups" value={overview.active}/>
+        <Metric icon={Users} label="People to transport" value={plan.people}/>
+        <Metric icon={AlertCircle} label="Groups needing attention" value={overview.attention} attention/>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-md bg-slate-100 p-0.5" aria-label="Date range">
@@ -166,14 +157,15 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     <div className="space-y-3" aria-label="Transfers by day">
       {plan.days.map((day,index)=>{
         const expanded=isExpandedDay(day.date),slotsId=dayIdPrefix+'-'+(day.date||'undated');
+        const pending=day.groups.filter(group=>transferGroupState(group)==='attention').length;
         const counts=[
           day.arrivals>0&&`${day.arrivals} arriving`,
           day.pickups>0&&`${day.pickups} returning`,
         ].filter(Boolean);
-        return <section key={day.date||'undated'} className="rounded-lg border bg-white" aria-label={day.date?`Transfers on ${display(day.date)}`:'Transfers with date to confirm'}>
+        return <section key={day.date||'undated'} className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label={day.date?`Transfers on ${display(day.date)}`:'Transfers with date to confirm'}>
           <h3>
             <button type="button" aria-expanded={expanded} aria-controls={slotsId}
-              className={'flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-slate-50 px-3 py-2.5 text-left hover:bg-slate-100 '+(expanded?'rounded-t-lg':'rounded-lg')}
+              className={'flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-white px-4 py-3.5 text-left hover:bg-slate-50 '+(expanded?'rounded-t-lg':'rounded-lg')}
               onClick={()=>setExpandedDays(previous=>({...previous,[day.date]:!expanded}))}>
               <span className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <ChevronRight aria-hidden="true" className={'size-4 shrink-0 '+(expanded?'rotate-90':'')}/>
@@ -181,10 +173,10 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
                 {day.date&&<span>{weekday(day.date)}</span>}
                 {day.date===today&&<span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Today</span>}
               </span>
-              <span className="text-xs font-medium text-slate-600">{counts.join(' · ')||'No pending transfers'}</span>
+              <span className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">{counts.length>0?<span>{counts.join(' · ')}</span>:<span>No passengers to transport</span>}{pending>0&&<span className="rounded-md bg-amber-50 px-2 py-1 text-amber-900">{pending} {pending===1?'group':'groups'} to review</span>}</span>
             </button>
           </h3>
-          <div id={slotsId} hidden={!expanded} className="divide-y border-t">
+          <div id={slotsId} hidden={!expanded} className="space-y-3 border-t bg-slate-50/60 p-3 sm:p-4">
             {day.groups.map(group=><TransferSlot key={group.key} group={group} expanded={isExpandedSlot(group.key)} onToggle={()=>setExpandedSlots(previous=>({...previous,[group.key]:!isExpandedSlot(group.key)}))} isAdmin={isAdmin} busy={busy} onEdit={open} onAllocate={openAllocation} onRemove={removeDriver}/>)}
           </div>
         </section>;
