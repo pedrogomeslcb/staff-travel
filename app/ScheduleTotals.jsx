@@ -2,6 +2,7 @@
 import {useState} from 'react';
 import {ChevronDown,BriefcaseBusiness} from 'lucide-react';
 import {SCHEDULE_CATEGORIES} from '../lib/planner.mjs';
+import {summaryRows,reportScope} from '../lib/schedule-report-scope.mjs';
 const number=value=>value.toLocaleString('en-US',{maximumFractionDigits:1});
 const grouped=[
   ['Onsite',['onsite','onsite-half']],
@@ -9,20 +10,23 @@ const grouped=[
   ['F-Day',['off']],['Vacation',['vacation']],['Other',['other']],
 ];
 const sum=(counts,keys)=>keys.reduce((n,key)=>n+(counts[key]||0),0);
-export default function ScheduleTotals({rows,categories,year,month,tags}) {
+export default function ScheduleTotals({rows,allRows,ownRow,user,scope,categories,year,month,tags}) {
   const [view,setView]=useState('monthly'),[expanded,setExpanded]=useState(false);
   const monthName=new Date(year,month-1,1).toLocaleDateString('en-US',{month:'long'});
   const monthShort=new Date(year,month-1,1).toLocaleDateString('en-US',{month:'short'});
-  const monthlyTotal=rows.reduce((n,row)=>n+row.monthlyTotal,0),annualTotal=rows.reduce((n,row)=>n+row.annualTotal,0);
+  const teamView=reportScope(user,scope)==='team';
+  const selected=summaryRows(user,scope,allRows,ownRow);
+  const available=teamView||Boolean(ownRow);
+  const monthlyTotal=selected.reduce((n,row)=>n+row.monthlyTotal,0),annualTotal=selected.reduce((n,row)=>n+row.annualTotal,0);
   const columns=(expanded?SCHEDULE_CATEGORIES.map(([key,label,color])=>({label,keys:[key],color})):grouped.map(([label,keys])=>({label,keys,color:SCHEDULE_CATEGORIES.find(c=>c[0]===keys[0])?.[2]}))).filter(c=>c.keys.some(k=>categories.includes(k)));
   return <details className="group rounded-xl border bg-white overflow-hidden" aria-label="Schedule man-days">
     <summary className="flex cursor-pointer list-none flex-wrap items-center gap-4 px-4 py-4 sm:px-5 [&::-webkit-details-marker]:hidden">
-      <div className="flex min-w-0 flex-1 items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600"><BriefcaseBusiness size={18} aria-hidden="true"/></span><div><h2 className="text-sm font-semibold text-slate-900">Man-days</h2><p className="mt-0.5 text-xs text-slate-500">Working days · {rows.length} {rows.length===1?'team member':'team members'}</p></div></div>
-      <div className="flex items-center gap-4 sm:gap-6"><div><p className="text-xs text-slate-500">{monthShort} {year}</p><p className="text-lg font-semibold tabular-nums text-slate-900">{number(monthlyTotal)}</p></div><div><p className="text-xs text-slate-500">{year} total</p><p className="text-lg font-semibold tabular-nums text-blue-900">{number(annualTotal)}</p></div><ChevronDown size={18} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true"/></div>
+      <div className="flex min-w-0 flex-1 items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600"><BriefcaseBusiness size={18} aria-hidden="true"/></span><div><h2 className="text-sm font-semibold text-slate-900">{teamView?'Team man-days':'My man-days'}</h2><p className="mt-0.5 text-xs text-slate-500">{teamView?'Working days · '+allRows.length+' '+(allRows.length===1?'team member':'team members'):available?'Your working days':'No personal Schedule row'}</p></div></div>
+      <div className="flex items-center gap-4 sm:gap-6"><div><p className="text-xs text-slate-500">{monthShort} {year}</p><p className="text-lg font-semibold tabular-nums text-slate-900">{available?number(monthlyTotal):'—'}</p></div><div><p className="text-xs text-slate-500">{year} total</p><p className="text-lg font-semibold tabular-nums text-blue-900">{available?number(annualTotal):'—'}</p></div><ChevronDown size={18} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true"/></div>
     </summary>
     <div className="border-t">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <p className="max-w-xl text-xs leading-relaxed text-slate-600">Onsite + Offsite only. Half-days = 0.5. Weekends, F-Days, Vacation and Other are excluded from man-day totals. Category filters affect only the breakdown.</p>
+        <p className="max-w-xl text-xs leading-relaxed text-slate-600">Onsite + Offsite only. Half-days = 0.5. Weekends, F-Days, Vacation and Other are excluded from man-day totals. The summary is independent of calendar filters; the breakdown follows them.</p>
         <div className="flex flex-wrap items-center gap-2"><div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Breakdown period">{[['monthly',monthShort],['annual',String(year)]].map(([value,label])=><button type="button" key={value} aria-pressed={view===value} onClick={()=>setView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(view===value?'bg-white shadow-sm text-blue-900':'text-slate-600')}>{label}</button>)}</div><button type="button" aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)} className="rounded-lg border px-3 py-2 text-xs text-slate-700 hover:bg-slate-50">{expanded?'Group categories':'Show half-day detail'}</button></div>
       </div>
       <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Man-days and category breakdown">
