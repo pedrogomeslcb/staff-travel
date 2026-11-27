@@ -22,7 +22,9 @@ const input='mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate
 export default function Database({database,shared,trips,onReferences,children}) {
   const [section,setSection]=useState('flights'),[catalog,setCatalog]=useState(null);
   const linked=database.linkedMemberships===true;
-  const visibleSections=children?sections:sections.filter(([key])=>key!=='access');
+  // Supabase Users & access already manages IHG per user. Keep the legacy
+  // membership tab only for workspaces without that account editor.
+  const visibleSections=sections.filter(([key])=>(key!=='access'||Boolean(children))&&!(key==='memberships'&&linked&&children));
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
   const [editor,setEditor]=useState(null),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
   useEffect(()=>{
