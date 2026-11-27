@@ -48,7 +48,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   },[allowTeamEdit,editUserId,team,user.role]);
   const [start,end]=selection&&members.some(p=>p.id===editUserId)?[selection.anchor,selection.end].sort():[];
   const selectedDates=useMemo(()=>start?dates.filter(date=>date>=start&&date<=end&&!isWeekend(date)):[],[dates,start,end]);
-  const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,{...period,categories}),[members,schedule,presence,period,categories]);
+  const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,period),[members,schedule,presence,period]);
   const years=[...new Set([...Array.from({length:11},(_,i)=>period.year-5+i),...Object.keys(schedule).map(k=>Number(k.slice(-10,-6))),...presence.flatMap(t=>[Number(String(t.checkin??'').slice(0,4)),Number(String(t.checkout??'').slice(0,4))])])].filter(y=>Number.isInteger(y)&&y>=1900&&y<=9999).sort((a,b)=>a-b);
   const monthStarts=new Set(months.map(m=>m.dates[0]));
   const currentMonth=iso(new Date(period.year,period.month-1,1)).slice(0,7);
