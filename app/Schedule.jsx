@@ -9,6 +9,7 @@ import {summarizeSchedule} from '../lib/schedule-totals.mjs';
 import {Popover,PopoverTrigger,PopoverContent} from '@/components/ui/popover';
 import CountryDays from './CountryDays';
 import ScheduleTotals from './ScheduleTotals';
+import {reportScope,reportYearDate} from '../lib/schedule-report-scope.mjs';
 import ScheduleDay from './ScheduleDay';
 
 const todayColumnEdge='inset 1px 0 #BFDBFE, inset -1px 0 #BFDBFE';
@@ -19,6 +20,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   const [range,setRange]=useState(()=>initialRange(month));
   const [viewportWidth,setViewportWidth]=useState(0);
   const [period,setPeriod]=useState(()=>({year:month.getFullYear(),month:month.getMonth()+1}));
+  const [reportView,setReportView]=useState('my');
   const [sector,setSector]=useState('all'),[personId,setPersonId]=useState('all');
   const [categories,setCategories]=useState(()=>SCHEDULE_CATEGORIES.map(c=>c[0]));
   const [showCodes,setShowCodes]=useState(false);
@@ -48,8 +50,12 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   },[allowTeamEdit,editUserId,team,user.role]);
   const [start,end]=selection&&members.some(p=>p.id===editUserId)?[selection.anchor,selection.end].sort():[];
   const selectedDates=useMemo(()=>start?dates.filter(date=>date>=start&&date<=end&&!isWeekend(date)):[],[dates,start,end]);
-  const totals=useMemo(()=>summarizeSchedule(members,schedule,presence,period),[members,schedule,presence,period]);
-  const years=[...new Set([...Array.from({length:11},(_,i)=>period.year-5+i),...Object.keys(schedule).map(k=>Number(k.slice(-10,-6))),...presence.flatMap(t=>[Number(String(t.checkin??'').slice(0,4)),Number(String(t.checkout??'').slice(0,4))])])].filter(y=>Number.isInteger(y)&&y>=1900&&y<=9999).sort((a,b)=>a-b);
+  const allTotals=useMemo(()=>summarizeSchedule(team,schedule,presence,period),[team,schedule,presence,period]);
+  const totals=useMemo(()=>{const ids=new Set(members.map(p=>p.id));return allTotals.filter(row=>ids.has(row.person.id));},[allTotals,members]);
+  const scope=reportScope(user,reportView);
+  const ownTotals=allTotals.find(row=>row.person.id===user.id)??null;
+  const ownCountryTrips=useMemo(()=>(trips||[]).filter(t=>t.userId===user.id),[trips]);
+  const years=[...new Set([...Array.from({length:11},(_,i)=>period.year-5+i),...Object.keys(schedule).map(k=>Number(k.slice(-10,-6))),...presence.flatMap(t=>[Number(String(t.checkin??'').slice(0,4)),Number(String(t.checkout??'').slice(0,4))]),...(countryTrips||[]).flatMap(t=>[Number(String(t.outDate??'').slice(0,4)),Number(String(t.returnDate??'').slice(0,4))])])].filter(y=>Number.isInteger(y)&&y>=1900&&y<=9999).sort((a,b)=>a-b);
   const monthStarts=new Set(months.map(m=>m.dates[0]));
   const currentMonth=iso(new Date(period.year,period.month-1,1)).slice(0,7);
   const dayTabStop=focusedDay?.startsWith(currentMonth)?focusedDay:currentMonth+'-01';
@@ -273,7 +279,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
             <h3 className="text-sm font-semibold">Schedule filters</h3>
             <div className="grid grid-cols-2 gap-3" aria-label="Schedule filters">
               <label className="text-xs text-slate-500">Month<select className="w-full border rounded-lg bg-white p-2 mt-1 text-sm text-slate-800" value={period.month} onChange={e=>jump(new Date(period.year,Number(e.target.value)-1,1))}>{Array.from({length:12},(_,i)=><option key={i} value={i+1}>{new Date(2000,i,1).toLocaleDateString('en-US',{month:'long'})}</option>)}</select></label>
-              <label className="text-xs text-slate-500">Year<select className="w-full border rounded-lg bg-white p-2 mt-1 text-sm text-slate-800" value={period.year} onChange={e=>jump(new Date(Number(e.target.value),period.month-1,1))}>{years.map(year=><option key={year}>{year}</option>)}</select></label>
+              <label className="text-xs text-slate-500">Year<select className="w-full border rounded-lg bg-white p-2 mt-1 text-sm text-slate-800" value={period.year} onChange={e=>jump(reportYearDate(period,Number(e.target.value)))}>{years.map(year=><option key={year}>{year}</option>)}</select></label>
               <label className="text-xs text-slate-500">{sectorLabel}<select className="w-full border rounded-lg bg-white p-2 mt-1 text-sm text-slate-800" value={sector} onChange={e=>{setSector(e.target.value);setPersonId('all');}}><option value="all">{sectorLabel==='Department'?'All departments':'All sectors'}</option>{[...tags].sort((a,b)=>a.name.localeCompare(b.name)).map(t=><option value={t.id} key={t.id}>{t.name}</option>)}<option value="unassigned">Unassigned</option></select></label>
               <label className="text-xs text-slate-500">Team member<select className="w-full border rounded-lg bg-white p-2 mt-1 text-sm text-slate-800" value={personId} onChange={e=>setPersonId(e.target.value)}><option value="all">All team members</option>{available.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
             </div>
@@ -398,7 +404,16 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       <button type="button" aria-label="Deselect dates" className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-blue-100" onClick={()=>{setSelection(null);setSelectionMessage('');}}><X size={14} aria-hidden="true"/>Deselect</button></>}
       {selectionMessage&&<span role="status">{selectionMessage}</span>}
     </div>}
-  </section><CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} trips={countryTrips} period={period} limited={countryLimited}/><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
+  </section>
+    <div className="flex flex-wrap items-center justify-between gap-3 px-1" aria-label="Schedule reporting controls">
+      <div><h2 className="text-sm font-semibold text-slate-900">Schedule totals</h2><p className="mt-0.5 text-xs text-slate-500">Expand a section to see the individual breakdown.</p></div>
+      <div className="flex flex-wrap items-center gap-2">
+        {user.role==='admin'&&<div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Summary scope">{[['my','My totals'],['team','Team totals']].map(([value,label])=><button type="button" key={value} aria-pressed={scope===value} onClick={()=>setReportView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(scope===value?'bg-white shadow-sm text-blue-900':'text-slate-600 hover:text-slate-900')}>{label}</button>)}</div>}
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">Year<select aria-label="Schedule totals year" className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-800" value={period.year} onChange={e=>jump(reportYearDate(period,Number(e.target.value)))}>{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
+      </div>
+    </div>
+    <CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} team={countryLimited?team.filter(p=>p.id===user.id):team} user={user} scope={scope} ownTrips={ownCountryTrips} trips={countryTrips||[]} period={period} limited={countryLimited}/>
+    <ScheduleTotals rows={totals} allRows={allTotals} ownRow={ownTotals} user={user} scope={scope} categories={categories} year={period.year} month={period.month} tags={tags}/>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}
   </div>;
 }
