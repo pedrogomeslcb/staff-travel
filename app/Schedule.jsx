@@ -257,9 +257,9 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
             <PopoverTrigger aria-label="Schedule help" className="inline-grid size-5 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700">?</PopoverTrigger>
             <PopoverContent align="start" aria-label="Schedule help" className="max-w-[calc(100vw_-_2rem)] space-y-2 bg-white text-xs text-slate-700">
               <p className="font-semibold text-slate-900">Schedule shortcuts</p>
-              <p>Use the month arrows or Today to navigate. Open Filters to jump to a specific month or use Fit month. Swipe or scroll horizontally to move between months.</p>
-              <p>Click a date in the header to see who is onsite or in another category that day. Use the arrow keys to move between dates.</p>
-              <p>Drag or Shift-click to select weekdays in your row. Double-click inside the selection to edit the whole range. Admins can also select and edit a colleague’s row.</p>
+              <p>Navigate with the arrows, Today, Filters or horizontal scrolling.</p>
+              <p>Select a date to view the team. Use arrow keys to move between dates.</p>
+              <p>Drag or Shift-click to select weekdays. Double-click to edit. Admins can edit other rows.</p>
               <p><kbd>Ctrl+C</kbd> copies the selection. Select the first destination day and press <kbd>Ctrl+V</kbd> to paste.</p>
               <p><kbd>Delete</kbd> or <kbd>Backspace</kbd> clears the selected weekdays. To restore hotel-based entries, use the hotel default in the category menu.</p>
               <p><kbd>Ctrl+Z</kbd> undoes the last schedule edit in this session.</p>
@@ -406,7 +406,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
     </div>}
   </section>
     <div className="flex flex-wrap items-center justify-between gap-3 px-1" aria-label="Schedule reporting controls">
-      <div><h2 className="text-sm font-semibold text-slate-900">Schedule totals</h2><p className="mt-0.5 text-xs text-slate-500">Expand a section to see the individual breakdown.</p></div>
+      <div><h2 className="text-sm font-semibold text-slate-900">Schedule totals</h2><p className="mt-0.5 text-xs text-slate-500">Expand for individual totals.</p></div>
       <div className="flex flex-wrap items-center gap-2">
         {user.role==='admin'&&<div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Summary scope">{[['my','My totals'],['team','Team totals']].map(([value,label])=><button type="button" key={value} aria-pressed={scope===value} onClick={()=>setReportView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(scope===value?'bg-white shadow-sm text-blue-900':'text-slate-600 hover:text-slate-900')}>{label}</button>)}</div>}
         <label className="flex items-center gap-2 text-xs font-medium text-slate-600">Year<select aria-label="Schedule totals year" className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-800" value={period.year} onChange={e=>jump(reportYearDate(period,Number(e.target.value)))}>{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>

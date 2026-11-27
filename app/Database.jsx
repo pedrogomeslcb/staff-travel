@@ -70,10 +70,10 @@ export default function Database({database,shared,trips,onReferences,children}) 
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div><h2 className="font-semibold text-slate-900">{label}</h2>
           {section==='memberships'&&<p className="mt-1 text-xs text-slate-600">{linked
-            ?'Each IHG membership number is linked directly to a username. Edit a user below to set or remove their number.'
-            :'New staff are added when they provide a membership number in a hotel request.'}</p>}
+            ?'IHG numbers linked to usernames.'
+            :'New memberships are added from hotel requests.'}</p>}
           {section==='drivers'&&linked&&catalog?.drivers?.some(d=>!d.stableId)&&<p className="mt-1 text-xs text-amber-800">To rename drivers without affecting existing transfers, install <a href="https://github.com/pedrogomeslcb/staff-travel/blob/main/supabase/stable-driver-identity.sql" target="_blank" rel="noopener noreferrer" className="underline">the driver identity migration</a> in Supabase, then refresh.</p>}
-          {section==='flights'&&<p className="mt-1 text-xs text-slate-600">Flight references for hotel requests. Times use the airport’s local time.</p>}
+          {section==='flights'&&<p className="mt-1 text-xs text-slate-600">Flight directory · Local airport times.</p>}
         </div>
         <div className="flex gap-2">
           <button type="button" className={outline} disabled={loading} onClick={()=>setReload(value=>value+1)}>Refresh</button>

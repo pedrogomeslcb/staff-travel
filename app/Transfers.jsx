@@ -129,7 +129,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
   return <div className="space-y-4">
     {focusKey&&user.role==='admin'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-4 py-3 text-sm"><span>Transfer selected from the Admin dashboard</span><div className="flex gap-3"><button type="button" className="text-blue-700" onClick={onBackToAdmin}>Back to dashboard</button><button type="button" className="text-blue-700" onClick={onClearFocus}>Show all transfers</button></div></div>}
     <section className="space-y-3 rounded-xl border bg-white p-4" aria-label="Transfer plan overview">
-      <div><h2 className="text-base font-semibold text-slate-900">Transfer plan</h2><p className="mt-1 text-xs text-slate-500">Airport arrivals and hotel pickups · {focusKey?'Selected transfer':period==='upcoming'?'Upcoming':'All dates'}</p></div>
+      <div><h2 className="text-base font-semibold text-slate-900">Transfer plan</h2><p className="mt-1 text-xs text-slate-500">{focusKey?'Selected transfer':period==='upcoming'?'Upcoming':'All dates'}</p></div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <Metric icon={CalendarDays} label="Transfer days" value={overview.days}/>
         <Metric icon={Car} label="Active groups" value={overview.active}/>
@@ -149,7 +149,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
           <button type="button" disabled={!plan.days.length} onClick={()=>setAllExpanded(false)} className="rounded-md border px-2.5 py-1.5 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50">Collapse all</button>
         </div>
       </div>
-      <p className="text-xs text-slate-500">Local times. Arrivals follow the flight and returns use the scheduled hotel pickup time.</p>
+      <p className="text-xs text-slate-500">Local times · Flight arrival / hotel pickup.</p>
     </section>
     {!passengersShared&&user.role!=='admin'&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Shared passenger details are not enabled yet. An admin must run supabase/transfer-copassengers.sql in Supabase SQL Editor.</p>}
     {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -184,7 +184,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     </div>
     {editing&&isAdmin&&<Dialog title="Edit transfer status" onClose={close} wide><form onSubmit={save} className="p-6 space-y-5">
       <div className="text-sm text-slate-600"><p><strong>{editing.trip.person}</strong> · {routes[editing.leg]}</p><p className="text-xs mt-2">{editing.date?display(editing.date):'Date to confirm'} · {editing.time||'Time to confirm'} · {editing.flight||'Flight to confirm'}</p></div>
-      {editing.transfer.needsReview&&<p className="bg-amber-50 rounded-lg p-3 text-sm text-amber-900">Travel or pickup details changed. Review this passenger’s transfer before saving.</p>}
+      {editing.transfer.needsReview&&<p className="bg-amber-50 rounded-lg p-3 text-sm text-amber-900">Trip details changed. Review before saving.</p>}
       <label className="block text-xs text-slate-600">Transfer status<select className={input+' mt-1'} value={editing.status} onChange={e=>setEditing(p=>({...p,status:e.target.value}))}>{TRANSFER_STATUSES.map(([value,label])=><option key={value} value={value}>{value==='to_arrange'?'Automatic (based on driver allocation)':label}</option>)}</select></label>
       {error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}
       <div className="flex gap-3"><button disabled={busy} className="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2.5 text-sm disabled:opacity-50">{busy?'Saving…':'Save status'}</button><button disabled={busy} type="button" className="px-3 text-sm" onClick={close}>Cancel</button></div>

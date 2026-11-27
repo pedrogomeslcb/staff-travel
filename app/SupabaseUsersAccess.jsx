@@ -169,8 +169,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
       <div>
         <h2 className="font-semibold">Users &amp; access</h2>
         <p className="text-xs text-slate-500">
-          Admins can manage users and roles. Password resets and deleting other admins
-          are restricted to the primary admin.
+          Admins manage users and roles. Only the primary admin can reset passwords or delete other admins.
         </p>
       </div>
       <button className={button} type="button" disabled={loading||busy} onClick={()=>{setError('');void refresh();}}>Refresh</button>
@@ -252,7 +251,7 @@ export default function SupabaseUsersAccess({client,currentUser,onChange}){
           </label>}
         </div>
         {editor.person.is_primary_admin&&<p className="text-xs text-slate-500">
-          The primary admin account is protected: its role and access cannot be changed here.
+          Primary admin role and access are protected.
         </p>}
         {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex flex-wrap items-center gap-3 border-t pt-4">

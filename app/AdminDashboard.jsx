@@ -7,11 +7,11 @@ import {activityLabels} from './TravelAudit';
 
 const link='rounded-md px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700';
 const actionInfo={
-  request:['Send hotel request','Request booking from the hotel'],
-  confirmation:['Follow up on confirmation','Obtain and record the confirmation number'],
-  reconfirm:['Reconfirm changed booking','Review changes with the hotel'],
-  cancel:['Notify hotel of cancellation','Record notice after contacting the hotel'],
-  transfer:['Arrange or review transfer','Check passenger seats and driver allocation'],
+  request:['Send hotel request','Send booking details'],
+  confirmation:['Follow up on confirmation','Record confirmation number'],
+  reconfirm:['Reconfirm changed booking','Contact the hotel'],
+  cancel:['Notify hotel of cancellation','Record cancellation notice'],
+  transfer:['Arrange or review transfer','Check drivers and seats'],
 };
 const timingLabel={past:'Past date',today:'Today',undated:'Date missing',upcoming:'Upcoming'};
 const format=value=>value?display(value):'Date to confirm';
@@ -46,7 +46,7 @@ function ActionQueue({data,today,onHotel,onTransfer}){
   const rows=dashboardActions(data.tasks,today,filter);
   const past=all.filter(r=>r.timing==='past').length,dueToday=all.filter(r=>r.timing==='today').length,undated=all.filter(r=>r.timing==='undated').length;
   return <section aria-label="Action center" className="overflow-hidden rounded-xl border bg-white">
-    <SectionHeading title="Action center" description="Unresolved hotel and transfer work. Open a record to take action.">
+    <SectionHeading title="Action center">
       <div className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-right">
         <p className="text-xl font-semibold tabular-nums text-slate-900">{all.length}{data.transferReady?'':'+'}</p><p className="text-xs text-slate-600">Open items</p>
       </div>
@@ -59,7 +59,7 @@ function ActionQueue({data,today,onHotel,onTransfer}){
         <span>{all.length-priority.length} upcoming</span>
       </p>
     </div>
-    {!data.transferReady&&<p role="status" className="mx-4 mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 sm:mx-5">Transfer counts are unavailable until driver references load. Refresh to try again.</p>}
+    {!data.transferReady&&<p role="status" className="mx-4 mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 sm:mx-5">Driver data unavailable. Refresh to retry.</p>}
     <div className="flex flex-wrap gap-1.5 px-4 py-3 sm:px-5" aria-label="Filter open actions">
       {[
         ['all','All'],
@@ -100,7 +100,7 @@ function TodayOperations({data,scheduleReady,onHotel,onTransfer,onSchedule}){
   ];
   const empty=message=><p className="py-2 text-sm text-slate-500">{message}</p>;
   return <section aria-label="Today's operations" className="rounded-xl border bg-white">
-    <SectionHeading title="Today's operations" description="Select a card to view the people and arrangements for today."/>
+    <SectionHeading title="Today's operations" description="Select a card for details."/>
     <div className="grid grid-cols-2 gap-2 px-4 pb-4 sm:gap-3 sm:px-5 lg:grid-cols-4">
       {cards.map(([key,icon,label,value,detail])=><SummaryCard key={key} icon={icon} label={label} value={value} detail={detail} selected={selection===key} controls={detailId} onClick={()=>setSelection(selection===key?null:key)}/>)}
     </div>
@@ -119,7 +119,7 @@ function ActivitySummary({events,loading,error,today,onLogs}){
   const counts=eventGroups.map(([label,kind])=>[label,todaysEvents.filter(e=>e.kind===kind).length]);
   const other=todaysEvents.length-counts.reduce((n,[,count])=>n+count,0);
   return <section aria-label="Recent activity" className="overflow-hidden rounded-xl border bg-white">
-    <SectionHeading title="Recent activity" description="What was recorded, by whom and for which team member."><button type="button" className={link+' shrink-0'} onClick={onLogs}>View all logs <ArrowRight className="inline" size={13} aria-hidden="true"/></button></SectionHeading>
+    <SectionHeading title="Recent activity"><button type="button" className={link+' shrink-0'} onClick={onLogs}>View all logs <ArrowRight className="inline" size={13} aria-hidden="true"/></button></SectionHeading>
     {loading?<p role="status" className="px-5 pb-4 text-sm text-slate-500">Loading activity…</p>:error?<p role="alert" className="px-5 pb-4 text-sm text-red-700">{error}</p>:<>
       <div className="border-y bg-slate-50 px-4 py-3 sm:px-5">
         <p className="text-sm font-medium text-slate-800">{todaysEvents.length} recorded {todaysEvents.length===1?'event':'events'} today</p>

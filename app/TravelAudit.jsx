@@ -39,7 +39,7 @@ export default function TravelAudit({repo,user,trips,shared,connected=false}) {
   return <section className="space-y-4 rounded-xl border bg-white p-5">
     <div className="flex flex-wrap justify-between gap-3">
       <div><h2 className="font-semibold text-slate-900">{connected?'Activity logs':'Travel audit log'}</h2>
-        <p className="mt-1 text-xs text-slate-600">{connected?'Hotels, schedule, transfers and account changes · Most recent 1,000 events':'Schedule and hotel activity'} · Times shown in your browser’s time zone{shared?'':' · This browser only'}</p>
+        <p className="mt-1 text-xs text-slate-600">{connected?'Latest 1,000 events':'Schedule and hotel activity'} · Browser time zone{shared?'':' · This browser only'}</p>
       </div>
       <button type="button" disabled={loading} className="self-start rounded-lg border px-3 py-2 text-sm text-blue-700" onClick={()=>setReload(value=>value+1)}>Refresh</button>
     </div>
