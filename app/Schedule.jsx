@@ -303,7 +303,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       <div className="flex flex-wrap items-center gap-2">
         {canEdit&&isAdminEditor&&<label className="flex items-center gap-2 text-xs text-slate-600">Edit <select aria-label="Edit team member" className="max-w-[12rem] rounded-md border bg-white px-2 py-1.5 text-sm text-slate-800" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);setSelectionMessage('');}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
         {canEdit&&onUndo&&<button type="button" className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs text-slate-700 hover:bg-slate-50" onClick={()=>{setSelectionMessage('');onUndo();}}><Undo2 size={14} aria-hidden="true"/>Undo</button>}
-        {canEdit&&<button type="button" onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800">{selectedDates.length?'Edit selection':'Set date range'}</button>}
+        {canEdit&&<button type="button" onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800">Set date range</button>}
       </div>
     </div>
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-[11px] text-slate-600" aria-label="Schedule legend">
@@ -311,12 +311,6 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-sm border border-slate-300 bg-white"/>{OFF_PROJECT_LABEL}</span>
       <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-sm border border-slate-300" style={{backgroundColor:WEEKEND_COLOR}}/>Weekend</span>
     </div>
-    {(selectedDates.length>0||selectionMessage)&&<div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900">
-      {selectedDates.length>0&&<><span className="font-medium">{editPerson?.name} · {display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>
-      <button type="button" disabled={!canEdit} className="rounded-md border border-blue-200 bg-white px-2.5 py-1.5 hover:bg-blue-100 disabled:opacity-50" onClick={clearSelectedDays}>Clear days</button>
-      <button type="button" aria-label="Deselect dates" className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-blue-100" onClick={()=>{setSelection(null);setSelectionMessage('');}}><X size={14} aria-hidden="true"/>Deselect</button></>}
-      {selectionMessage&&<span role="status">{selectionMessage}</span>}
-    </div>}
     <div ref={viewport} onScroll={extendTimeline} onCopy={copySelection} onPaste={pasteSelection} onKeyDown={handleCalendarKey}
       onPointerUp={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerCancel={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerLeave={()=>{dragAnchor.current=null;dragPerson.current=null;}}
       className="overflow-auto max-h-[65vh] border-t [scrollbar-gutter:stable]" role="region" aria-label="Continuous schedule timeline" tabIndex={0}>
@@ -398,6 +392,12 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       </table>
       {!members.length&&<p className="p-6 text-sm text-slate-500">No team members to display yet.</p>}
     </div>
+    {(selectedDates.length>0||selectionMessage)&&<div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900">
+      {selectedDates.length>0&&<><span className="font-medium">{editPerson?.name} · {display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>
+      <button type="button" disabled={!canEdit} className="rounded-md border border-blue-200 bg-white px-2.5 py-1.5 hover:bg-blue-100 disabled:opacity-50" onClick={clearSelectedDays}>Clear days</button>
+      <button type="button" aria-label="Deselect dates" className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-blue-100" onClick={()=>{setSelection(null);setSelectionMessage('');}}><X size={14} aria-hidden="true"/>Deselect</button></>}
+      {selectionMessage&&<span role="status">{selectionMessage}</span>}
+    </div>}
   </section><CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} trips={countryTrips} period={period} limited={countryLimited}/><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}
   </div>;
