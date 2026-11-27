@@ -20,7 +20,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   const [range,setRange]=useState(()=>initialRange(month));
   const [viewportWidth,setViewportWidth]=useState(0);
   const [period,setPeriod]=useState(()=>({year:month.getFullYear(),month:month.getMonth()+1}));
-  const [reportView,setReportView]=useState('my');
+  const [reportView,setReportView]=useState('my'),[reportDetail,setReportDetail]=useState(null);
   const [sector,setSector]=useState('all'),[personId,setPersonId]=useState('all');
   const [categories,setCategories]=useState(()=>SCHEDULE_CATEGORIES.map(c=>c[0]));
   const [showCodes,setShowCodes]=useState(false);
@@ -405,15 +405,19 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       {selectionMessage&&<span role="status">{selectionMessage}</span>}
     </div>}
   </section>
-    <div className="flex flex-wrap items-center justify-between gap-3 px-1" aria-label="Schedule reporting controls">
-      <div><h2 className="text-sm font-semibold text-slate-900">Schedule totals</h2><p className="mt-0.5 text-xs text-slate-500">Expand for individual totals.</p></div>
-      <div className="flex flex-wrap items-center gap-2">
-        {user.role==='admin'&&<div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Summary scope">{[['my','My totals'],['team','Team totals']].map(([value,label])=><button type="button" key={value} aria-pressed={scope===value} onClick={()=>setReportView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(scope===value?'bg-white shadow-sm text-blue-900':'text-slate-600 hover:text-slate-900')}>{label}</button>)}</div>}
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">Year<select aria-label="Schedule totals year" className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-800" value={period.year} onChange={e=>jump(reportYearDate(period,Number(e.target.value)))}>{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
+    <section className="rounded-xl border bg-white overflow-hidden" aria-label="Schedule totals">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-5">
+        <div><h2 className="font-semibold text-slate-900">Schedule totals</h2><p className="mt-0.5 text-xs text-slate-500">{monthLabel}</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {user.role==='admin'&&<div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Summary scope">{[['my','My totals'],['team','Team totals']].map(([value,label])=><button type="button" key={value} aria-pressed={scope===value} onClick={()=>setReportView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(scope===value?'bg-white shadow-sm text-blue-900':'text-slate-600 hover:text-slate-900')}>{label}</button>)}</div>}
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">Year<select aria-label="Schedule totals year" className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-800" value={period.year} onChange={e=>jump(reportYearDate(period,Number(e.target.value)))}>{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
+        </div>
+      </header>
+      <div className="grid grid-cols-1 gap-3 bg-slate-50/60 p-3 sm:grid-cols-2 sm:p-4">
+        <ScheduleTotals rows={totals} allRows={allTotals} ownRow={ownTotals} user={user} scope={scope} categories={categories} year={period.year} month={period.month} tags={tags} open={reportDetail==='man-days'} onToggle={()=>setReportDetail(v=>v==='man-days'?null:'man-days')}/>
+        <CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} team={countryLimited?team.filter(p=>p.id===user.id):team} user={user} scope={scope} ownTrips={ownCountryTrips} trips={countryTrips||[]} period={period} limited={countryLimited} open={reportDetail==='country'} onToggle={()=>setReportDetail(v=>v==='country'?null:'country')}/>
       </div>
-    </div>
-    <CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} team={countryLimited?team.filter(p=>p.id===user.id):team} user={user} scope={scope} ownTrips={ownCountryTrips} trips={countryTrips||[]} period={period} limited={countryLimited}/>
-    <ScheduleTotals rows={totals} allRows={allTotals} ownRow={ownTotals} user={user} scope={scope} categories={categories} year={period.year} month={period.month} tags={tags}/>
+    </section>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}
   </div>;
 }
