@@ -452,7 +452,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       </nav>
       {tripStep===0?<div className="space-y-4">
         <h3 id="trip-details-heading" tabIndex={-1} className="sr-only">Trip details</h3>
-        <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: local to the airport or pickup location. Hotel and pickup dates are prefilled from your flights and can be edited.</p>
+        <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: local to the airport or pickup location.</p>
         <section className="space-y-3 rounded-xl border p-4" aria-labelledby="trip-flights-heading">
           <h3 id="trip-flights-heading" tabIndex={-1} className="font-semibold text-slate-900 outline-none">Flights</h3>
           <div className="grid gap-3 sm:grid-cols-2">
