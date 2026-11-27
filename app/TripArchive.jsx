@@ -81,7 +81,7 @@ export default function TripArchive({client,trips,refresh}){
   }
   return <details className="rounded-xl border bg-white p-4 text-sm">
     <summary className="cursor-pointer font-medium">Trip archive · {count} eligible</summary>
-    <p className="my-3">Trips become eligible 30 days after check-out.</p>
+    <p className="my-3">Eligible 30 days after check-out.</p>
     <div className="flex flex-wrap gap-2">
       <button className={button} disabled={!count||busy} onClick={()=>run(false)}>Download archive</button>
       <button className={button} onClick={()=>fileInput.current?.click()}>Import archive</button>
@@ -89,7 +89,7 @@ export default function TripArchive({client,trips,refresh}){
     </div>
     {pending&&<div className="mt-4 space-y-3 rounded-lg bg-amber-50 p-3">
       <label className="block"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/> I saved the file with all {pending.count} trips.</label>
-      <p>Archiving keeps a summary on the site. Open the saved file to review full details later.</p>
+      <p>The site keeps a summary. Import the saved file for full details.</p>
       <button className={button} disabled={!confirmed||busy} onClick={()=>run(true)}>Confirm and archive</button>
       <button className="ml-3" disabled={busy} onClick={()=>{setPending(null);setConfirmed(false);}}>Cancel</button>
     </div>}

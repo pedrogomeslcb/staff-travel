@@ -25,7 +25,7 @@ export default function ScheduleDay({date,people,tags,schedule,presence,userId,o
         <p>{weekday}</p>
         {!weekend&&isTeamMember&&<p>Your schedule <strong className="font-semibold text-slate-900">{categoryDetails.get(ownStatus).label}</strong></p>}
       </div>
-      {weekend?<p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">The team schedule covers weekdays.</p>:<>
+      {weekend?<p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Weekdays only.</p>:<>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium text-slate-600">Schedule category
             <select className={select} value={category} onChange={event=>setCategory(event.target.value)}>

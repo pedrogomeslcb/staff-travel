@@ -26,7 +26,7 @@ export default function ScheduleTotals({rows,allRows,ownRow,user,scope,categorie
     </summary>
     <div className="border-t">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <p className="max-w-xl text-xs leading-relaxed text-slate-600">Onsite + Offsite only. Half-days = 0.5. Weekends, F-Days, Vacation and Other are excluded from man-day totals. The summary is independent of calendar filters; the breakdown follows them.</p>
+        <p className="max-w-xl text-xs leading-relaxed text-slate-600">Man-days = Onsite + Offsite weekdays (half-days = 0.5). Filters apply to the breakdown only.</p>
         <div className="flex flex-wrap items-center gap-2"><div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Breakdown period">{[['monthly',monthShort],['annual',String(year)]].map(([value,label])=><button type="button" key={value} aria-pressed={view===value} onClick={()=>setView(value)} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(view===value?'bg-white shadow-sm text-blue-900':'text-slate-600')}>{label}</button>)}</div><button type="button" aria-pressed={expanded} onClick={()=>setExpanded(v=>!v)} className="rounded-lg border px-3 py-2 text-xs text-slate-700 hover:bg-slate-50">{expanded?'Group categories':'Show half-day detail'}</button></div>
       </div>
       <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Man-days and category breakdown">

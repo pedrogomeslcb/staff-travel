@@ -136,8 +136,8 @@ export default function SupabaseGate() {
           onClick={()=>{setView('register');setError('');setNotice('');setPassword('');setConfirmPassword('');setShowPassword(false);}}>Create account</button>
       </div>
       <p className="text-sm text-slate-600">{view==='register'
-        ?'New team members can create their own login using the internal team access code. Accounts always start as User.'
-        :'Sign in with your username and password. The primary administrator may use an email address.'}</p>
+        ?'Register with the team access code. New accounts start as User.'
+        :'Use your username and password. Primary admin: email or username.'}</p>
       <form onSubmit={view==='register'?register:login} className="space-y-4">
         {view==='register'&&<>
           <label className="block text-sm">Name and last name<input type="text" required maxLength={120}
@@ -160,7 +160,7 @@ export default function SupabaseGate() {
           <label className="block text-sm">Team access code<input type="password" required
             autoComplete="off" className={input+' mt-1'} value={teamCode}
             onChange={e=>setTeamCode(e.target.value)}/></label>
-          <p className="text-xs text-amber-800">You can register without an admin. Your IHG membership is linked separately after identity verification; the registration code does not grant access to anyone else's membership.</p>
+          <p className="text-xs text-amber-800">IHG membership requires separate identity verification. The team code does not grant membership access.</p>
         </>}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showPassword} onChange={e=>setShowPassword(e.target.checked)}/>Show password</label>
         {view==='register'&&confirmPassword&&password!==confirmPassword&&<p role="status" className="text-sm text-red-700">Passwords do not match.</p>}
@@ -169,7 +169,7 @@ export default function SupabaseGate() {
       </form>
       {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {notice&&<p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
-      {view==='login'&&<details className="text-sm text-slate-600"><summary className="cursor-pointer font-medium text-blue-700">Forgot your password?</summary><p className="mt-2">Contact a Staff Planner administrator with your username to request a password reset. Never send your password.</p></details>}
+      {view==='login'&&<details className="text-sm text-slate-600"><summary className="cursor-pointer font-medium text-blue-700">Forgot your password?</summary><p className="mt-2">Ask an administrator to reset your password. Share your username, never your password.</p></details>}
     </div>
   </main>;
 }

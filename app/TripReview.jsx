@@ -32,7 +32,7 @@ function FlightCard({label,flight,origin,destination,date,time}){
 export default function TripReview({trip,trips,userId,personName,editing,busy,onEdit,joinedPickup}){
   const {days,nights,years}=tripReview(trip,trips,userId,editing);
   return <div className="space-y-4">
-    <div><h3 id="trip-review-heading" tabIndex={-1} className="text-lg font-semibold outline-none">Review your trip</h3><p className="text-sm text-slate-600">Check the details below before submitting.</p></div>
+    <div><h3 id="trip-review-heading" tabIndex={-1} className="text-lg font-semibold outline-none">Review your trip</h3></div>
     <section className="rounded-xl border border-blue-100 bg-blue-50 p-4">
       <p className="flex items-center gap-2 text-xs font-medium text-blue-800"><CalendarDays className="size-4" aria-hidden="true"/>Travel period</p>
       <p className="mt-2 text-lg font-semibold text-blue-950">{formatDate(trip.outDate)} – {formatDate(trip.returnDate)}</p>
@@ -44,7 +44,7 @@ export default function TripReview({trip,trips,userId,personName,editing,busy,on
         <FlightCard label="Arrival" flight={trip.outFlight} origin={trip.outOrigin} destination={trip.outDestination} date={trip.outDate} time={trip.outTime}/>
         <FlightCard label="Departure" flight={trip.returnFlight} origin={trip.returnOrigin} destination={trip.returnDestination} date={trip.returnDate} time={trip.returnTime}/>
       </div>
-      <p className="text-xs text-slate-500">All times are local to the airport.</p>
+      <p className="text-xs text-slate-500">Local airport times.</p>
     </ReviewSection>
     <ReviewSection icon={BedDouble} title="Hotel" onEdit={()=>onEdit('trip-hotel-heading')} busy={busy}>
       <dl className="grid grid-cols-2 gap-3 text-sm"><Detail label="Check-in" value={formatDate(trip.checkin)}/><Detail label="Check-out" value={formatDate(trip.checkout)}/><Detail label="IHG membership" value={trip.membership}/><Detail label="Traveler" value={personName}/></dl>
@@ -61,7 +61,7 @@ export default function TripReview({trip,trips,userId,personName,editing,busy,on
       <div role="img" aria-label={total+' of '+annualLimit+' days after this trip'} className="flex h-3 overflow-hidden rounded-full bg-slate-200"><div className="bg-emerald-700" style={{width:Math.min(100,otherDays/annualLimit*100)+'%'}}/><div className="bg-blue-600" style={{width:Math.max(0,Math.min(annualLimit-otherDays,additionalDays)/annualLimit*100)+'%'}}/></div>
       {total>=75&&<p role="status" className={'rounded-md p-2 text-sm '+(remaining<0?'bg-red-50 text-red-800':'bg-amber-50 text-amber-900')}>{remaining<0?'Annual allowance exceeded by '+Math.abs(remaining)+' days.':remaining===0?'Annual allowance reached.':total>=85?'Near the annual allowance.':'Monitor your remaining allowance.'}</p>}
     </ReviewSection>)}
-    {editing!==null&&trip.confirmationNumber&&<p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Changes to a confirmed request may require hotel reconfirmation. The confirmation number will be preserved.</p>}
-    <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Submitting this trip saves your request. Hotel and transfer arrangements are not automatically confirmed.</p>
+    {editing!==null&&trip.confirmationNumber&&<p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Hotel reconfirmation may be required. The confirmation number stays saved.</p>}
+    <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Submission does not confirm hotel or transfers.</p>
   </div>;
 }

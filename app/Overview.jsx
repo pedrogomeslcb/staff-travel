@@ -41,18 +41,18 @@ export default function Overview({user,people,trips,countryTrips,countryLimited,
       <div className="flex flex-wrap gap-2"><button type="button" className={secondary} disabled={busy} onClick={()=>onEdit(t)}>Edit trip</button><button type="button" className={secondary} onClick={()=>onNavigate('transport')}>Transfer details</button><button type="button" className={secondary} onClick={()=>onNavigate('travel')}>Hotel details</button></div></>}
   </article>;
   return <div className="space-y-5">
-    <section><h2 className="text-xl font-semibold">My overview</h2><p className="text-sm text-slate-600">Your schedule, trips and travel allowance in one place.</p></section>
+    <section><h2 className="text-xl font-semibold">My overview</h2></section>
     {ready&&<><div className="grid gap-3 md:grid-cols-3">
       <section className="rounded-xl border bg-white p-4 md:col-span-2"><h3 className="font-medium">Days in country · {year}</h3>
         <div className="mt-3 grid grid-cols-3 gap-2 text-sm">{[['Completed',total.completed],['Planned',total.planned],['Remaining',Math.max(0,total.remaining)]].map(([name,value])=><div key={name}><p className="text-xs text-slate-600">{name}</p><p className="text-2xl font-semibold tabular-nums">{value}</p></div>)}</div>
         <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-200" role="img" aria-label={total.total+' of '+annualLimit+' days used or planned'}><div className="bg-emerald-700" style={{width:Math.min(100,total.completed/annualLimit*100)+'%'}}/><div className="bg-blue-600" style={{width:Math.max(0,Math.min(annualLimit-total.completed,total.planned)/annualLimit*100)+'%'}}/></div>
-        <p className="mt-2 text-xs text-slate-600">{total.total} of {annualLimit} days used or planned. Includes arrival, departure and weekends; overlapping stays count once.</p>
+        <p className="mt-2 text-xs text-slate-600">{total.total} of {annualLimit} days used or planned · Calendar days.</p>
         {total.total>=75&&<p role="status" className="mt-2 text-sm font-medium text-amber-900">{total.remaining<0?Math.abs(total.remaining)+' days over the allowance.':total.total>=90?'Annual allowance reached.':total.total>=85?'Near the annual allowance.':'Monitor your remaining allowance.'}</p>}
         {countryLimited&&<p className="mt-2 text-xs text-slate-600">Only your flight dates are available.</p>}
       </section>
       <section className="rounded-xl border bg-white p-4"><h3 className="font-medium">Today · {display(today)}</h3><p className="mt-2 text-lg font-semibold">{scheduleLabel}</p><p className="mt-2 text-sm text-slate-600">{onsite.length} team members onsite</p>{onsite.length>0&&<details className="mt-2 text-sm"><summary className="cursor-pointer text-blue-700">View names</summary><ul className="mt-2 space-y-1">{onsite.map(p=><li key={p.id}>{p.name}</li>)}</ul></details>}<button type="button" className={secondary+' mt-3'} onClick={()=>onNavigate('planner')}>Open schedule</button></section>
     </div><section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">My trips</h2><button type="button" disabled={busy} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm text-white disabled:opacity-50" onClick={onPlan}>Plan a trip</button></div>
-      {upcoming.length?upcoming.map(tripCard):<div className="rounded-xl border bg-white p-6 text-center"><h3 className="font-medium">No upcoming trips</h3><p className="mt-1 text-sm text-slate-600">Add flights, hotel and airport transfers in one request.</p></div>}
+      {upcoming.length?upcoming.map(tripCard):<div className="rounded-xl border bg-white p-6 text-center"><h3 className="font-medium">No upcoming trips</h3><p className="mt-1 text-sm text-slate-600">Plan a trip to get started.</p></div>}
       <button type="button" className={secondary} aria-expanded={history} onClick={()=>setHistory(v=>!v)}>{history?'Hide':'Show'} past and canceled trips ({past.length})</button>
       {history&&past.map(tripCard)}<p role="status" className="text-sm text-slate-600">{copied}</p>
     </section></>}
