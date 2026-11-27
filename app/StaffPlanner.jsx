@@ -97,7 +97,14 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [people,setPeople]=useState([]),[trips,setTrips]=useState([]),[schedule,setSchedule]=useState({});
   const [sharedScheduleReady,setSharedScheduleReady]=useState(!connected);
   const [tab,setTab]=useState(initialUser?.role==='admin'?'admin':'overview'),[modal,setModal]=useState(false),[editing,setEditing]=useState(null),[trip,setTrip]=useState({...blank});
-  const [error,setError]=useState(''),[message,setMessage]=useState(''),[drafts,setDrafts]=useState({}),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
+  const [error,setError]=useState(''),[notification,setNotification]=useState(null),[drafts,setDrafts]=useState({}),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
+  const message=notification?.text||'';
+  function setMessage(text){setNotification(text?{text}:null);}
+  useEffect(()=>{
+    if(!notification)return;
+    const timeout=setTimeout(()=>setNotification(current=>current===notification?null:current),5000);
+    return ()=>clearTimeout(timeout);
+  },[notification]);
   const [month,setMonth]=useState(()=>new Date()),[scheduleEdit,setScheduleEdit]=useState(null);
   const [hotelName,setHotelName]=useState('');
   const [tripStep,setTripStep]=useState(0);
