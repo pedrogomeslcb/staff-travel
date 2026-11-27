@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState, useEffect, useMemo, useRef, useId} from 'react';
-import {blank, pad, iso, parse, display, maskDate, nightsBetween, toDraft, changeTrip, prepareRequest, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
+import {blank, pad, iso, parse, calendarAnchor, display, maskDate, nightsBetween, toDraft, changeTrip, prepareRequest, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
 import {HotelReminderError} from '../lib/travel-audit.mjs';
 import {scheduleWeekdays} from '../lib/schedule-edit.mjs';
 import {localRepository, remoteRepository, KEYS} from '../lib/repository.mjs';
@@ -57,7 +57,7 @@ function CanceledHotelCard({trip,busy,onNotify,isAdmin}) {
   </article>;
 }
 
-function DateField({label,value,onChange}) {
+function DateField({label,value,onChange,calendarReference=''}) {
   const [open,setOpen]=useState(false),[month,setMonth]=useState(new Date()),id=useId(),ref=useRef(null);
   const count=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
   useEffect(()=>{
@@ -68,7 +68,7 @@ function DateField({label,value,onChange}) {
     const element=ref.current;
     return ()=>{document.removeEventListener('pointerdown',close);element?.removeEventListener('keydown',escape);};
   },[open]);
-  return <div ref={ref} className="relative min-w-0"><label htmlFor={id} className="block text-xs text-slate-600 mb-1">{label}</label><div className="flex gap-1"><input id={id} required className={input+' min-w-0'} placeholder="DD/MM/YYYY" inputMode="numeric" maxLength={10} value={value} onChange={e=>onChange(maskDate(e.target.value))}/><button type="button" aria-label={'Calendar: '+label} aria-expanded={open} className="border rounded-lg px-3" onClick={()=>{const p=parse(value);if(p)setMonth(new Date(p+'T12:00:00'));setOpen(!open);}}>▦</button></div>{open&&<div className="absolute top-full mt-1 bg-white border rounded-xl p-3 shadow-xl w-64 max-w-[80vw] z-50"><div className="flex justify-between mb-3 items-center"><button type="button" aria-label={'Previous month: '+label} onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}>‹</button><span className="text-sm">{month.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><button type="button" aria-label={'Next month: '+label} onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}>›</button></div><div className="grid grid-cols-7 gap-1 text-center text-xs">{['Su','Mo','Tu','We','Th','Fr','Sa'].map(x=><span key={x}>{x}</span>)}{Array.from({length:new Date(month.getFullYear(),month.getMonth(),1).getDay()},(_,i)=><span key={'b'+i}/>)}{Array.from({length:count},(_,i)=>{const d=iso(new Date(month.getFullYear(),month.getMonth(),i+1));return <button type="button" aria-label={label+': '+display(d)} aria-pressed={parse(value)===d} key={d} className={'p-2 rounded hover:bg-blue-100 '+(parse(value)===d?'bg-blue-700 text-white':'')} onClick={()=>{onChange(display(d));setOpen(false);}}>{i+1}</button>;})}</div><button type="button" className="text-xs mt-3" onClick={()=>setOpen(false)}>Close calendar</button></div>}</div>;
+  return <div ref={ref} className="relative min-w-0"><label htmlFor={id} className="block text-xs text-slate-600 mb-1">{label}</label><div className="flex gap-1"><input id={id} required className={input+' min-w-0'} placeholder="DD/MM/YYYY" inputMode="numeric" maxLength={10} value={value} onChange={e=>onChange(maskDate(e.target.value))}/><button type="button" aria-label={'Calendar: '+label} aria-expanded={open} className="border rounded-lg px-3" onClick={()=>{if(!open){const p=calendarAnchor(value,calendarReference);if(p)setMonth(new Date(p+'T12:00:00'));}setOpen(!open);}}>▦</button></div>{open&&<div className="absolute top-full mt-1 bg-white border rounded-xl p-3 shadow-xl w-64 max-w-[80vw] z-50"><div className="flex justify-between mb-3 items-center"><button type="button" aria-label={'Previous month: '+label} onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}>‹</button><span className="text-sm">{month.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><button type="button" aria-label={'Next month: '+label} onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}>›</button></div><div className="grid grid-cols-7 gap-1 text-center text-xs">{['Su','Mo','Tu','We','Th','Fr','Sa'].map(x=><span key={x}>{x}</span>)}{Array.from({length:new Date(month.getFullYear(),month.getMonth(),1).getDay()},(_,i)=><span key={'b'+i}/>)}{Array.from({length:count},(_,i)=>{const d=iso(new Date(month.getFullYear(),month.getMonth(),i+1));return <button type="button" aria-label={label+': '+display(d)} aria-pressed={parse(value)===d} key={d} className={'p-2 rounded hover:bg-blue-100 '+(parse(value)===d?'bg-blue-700 text-white':'')} onClick={()=>{onChange(display(d));setOpen(false);}}>{i+1}</button>;})}</div><button type="button" className="text-xs mt-3" onClick={()=>setOpen(false)}>Close calendar</button></div>}</div>;
 }
 function TimeField({label,value,onChange}) {
   const [h='',m='']=(value||'').split(':');
@@ -371,7 +371,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       <option value={number} key={number} label={number+' · '+flight.origin+' → '+flight.destination}/>)}</datalist>
   </label>;
   const fixed=(label,value)=><label className="block text-xs text-slate-600">{label}<input readOnly className={input+' mt-1 bg-slate-50'} value={value}/></label>;
-  const date=(label,key)=><DateField label={label} value={trip[key]} onChange={v=>change(key,v)}/>;
+  const date=(label,key)=><DateField label={label} value={trip[key]} calendarReference={key==='checkout'?trip.checkin:''} onChange={v=>change(key,v)}/>;
   const time=(label,key)=><TimeField label={label} value={trip[key]} onChange={v=>change(key,v)}/>;
   const nights=nightsBetween(trip.checkin,trip.checkout);
   const eligiblePickupOptions=pickupOptions.filter(option=>{
