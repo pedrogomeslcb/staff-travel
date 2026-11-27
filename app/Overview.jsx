@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {display,iso,resolveScheduleDay,SCHEDULE_CATEGORIES} from '../lib/planner.mjs';
+import {display,iso,resolveScheduleDay,SCHEDULE_CATEGORIES,OFF_PROJECT_LABEL,isWeekend} from '../lib/planner.mjs';
 import {annualLimit,countryYearBreakdown} from '../lib/country-days.mjs';
 import {buildTransferPlan} from '../lib/transfer-plan.mjs';
 
@@ -29,7 +29,7 @@ export default function Overview({user,people,trips,countryTrips,countryLimited,
   const upcoming=mine.filter(t=>!t.canceledAt&&!t.archivedAt&&(t.returnDate||t.checkout||'')>=today);
   const past=mine.filter(t=>!upcoming.includes(t)).reverse();
   const total=countryYearBreakdown(mine,user.id,year,today);
-  const scheduleLabel=SCHEDULE_CATEGORIES.find(c=>c[0]===resolveScheduleDay(schedule,presence,user.id,today)?.status)?.[1]||'No entry';
+  const scheduleLabel=isWeekend(today)?'Weekend':SCHEDULE_CATEGORIES.find(c=>c[0]===resolveScheduleDay(schedule,presence,user.id,today)?.status)?.[1]||OFF_PROJECT_LABEL;
   const onsite=people.filter(p=>!p.deletedAt&&!p.isPrimaryAdmin&&['onsite','onsite-half'].includes(resolveScheduleDay(schedule,presence,p.id,today)?.status));
   const groups=useMemo(()=>buildTransferPlan(transferTrips,{period:'all',allocations,drivers:drivers??[]}).days.flatMap(d=>d.groups),[transferTrips,allocations,drivers]);
   const copy=async value=>{try{await navigator.clipboard.writeText(value);setCopied('Confirmation number copied.');}catch{setCopied('Could not copy. Select the confirmation number to copy manually.');}};

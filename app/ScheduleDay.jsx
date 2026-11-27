@@ -1,11 +1,11 @@
 'use client';
 
 import {useState} from 'react';
-import {SCHEDULE_CATEGORIES,display,isWeekend,resolveScheduleDay} from '../lib/planner.mjs';
+import {SCHEDULE_CATEGORIES,OFF_PROJECT_LABEL,display,isWeekend,resolveScheduleDay} from '../lib/planner.mjs';
 import {scheduleDayGroups} from '../lib/timeline.mjs';
 import Dialog from './Dialog';
 
-const categories=[...SCHEDULE_CATEGORIES,['unplanned','No entry','#94A3B8']];
+const categories=[...SCHEDULE_CATEGORIES,['unplanned',OFF_PROJECT_LABEL,'#94A3B8']];
 const categoryDetails=new Map(categories.map(([status,label,color])=>[status,{label,color}]));
 const select='mt-1 w-full rounded-lg border bg-white px-2.5 py-2 text-sm text-slate-800';
 

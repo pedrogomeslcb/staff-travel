@@ -1,10 +1,10 @@
 'use client';
 
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {MAX_SCHEDULE_CHANGES,PlannerError,SCHEDULE_BLANK,SCHEDULE_CATEGORIES,iso,display,isWeekend,resolveScheduleDay} from '../lib/planner.mjs';
+import {MAX_SCHEDULE_CHANGES,PlannerError,SCHEDULE_BLANK,SCHEDULE_CATEGORIES,OFF_PROJECT_LABEL,iso,display,isWeekend,resolveScheduleDay} from '../lib/planner.mjs';
 import {schedulePaste} from '../lib/schedule-edit.mjs';
 import {WEEKEND_COLOR,dampMonthScroll,schedulePeople,timelineLayout,timelineMonthOffset,timelineMonths} from '../lib/timeline.mjs';
-import {tagTextColor} from '../lib/accounts.mjs';
+import {ChevronLeft,ChevronRight,SlidersHorizontal,Undo2,X} from 'lucide-react';
 import {summarizeSchedule} from '../lib/schedule-totals.mjs';
 import {Popover,PopoverTrigger,PopoverContent} from '@/components/ui/popover';
 import CountryDays from './CountryDays';
@@ -53,6 +53,11 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   const monthStarts=new Set(months.map(m=>m.dates[0]));
   const currentMonth=iso(new Date(period.year,period.month-1,1)).slice(0,7);
   const dayTabStop=focusedDay?.startsWith(currentMonth)?focusedDay:currentMonth+'-01';
+  const filterCount=Number(sector!=='all')+Number(personId!=='all'&&personId!==user.id)+Number(categories.length!==SCHEDULE_CATEGORIES.length);
+  const monthLabel=new Date(period.year,period.month-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const editPerson=team.find(p=>p.id===editUserId);
+  const isAdminEditor=allowTeamEdit&&user.role==='admin';
+  const showMySchedule=team.some(p=>p.id===user.id);
   useLayoutEffect(()=>{
     const element=viewport.current;
     let lastWidth=0;
@@ -239,14 +244,14 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
     if (event.key==='Escape') {setSelection(null);setSelectionMessage('');}
   }
   return <div className="space-y-4"><section className="bg-white border rounded-xl overflow-hidden isolate">
-    <div className="flex flex-wrap justify-between items-center gap-3 p-4">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
       <div className="flex items-center gap-2">
-          <h2 className="font-medium">Schedule</h2>
+          <h2 className="text-base font-semibold text-slate-900">Schedule</h2>
           <Popover>
             <PopoverTrigger aria-label="Schedule help" className="inline-grid size-5 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700">?</PopoverTrigger>
             <PopoverContent align="start" aria-label="Schedule help" className="max-w-[calc(100vw_-_2rem)] space-y-2 bg-white text-xs text-slate-700">
               <p className="font-semibold text-slate-900">Schedule shortcuts</p>
-              <p>Open Filters to select a month or use Fit month. Swipe or scroll horizontally to move between months.</p>
+              <p>Use the month arrows or Today to navigate. Open Filters to jump to a specific month or use Fit month. Swipe or scroll horizontally to move between months.</p>
               <p>Click a date in the header to see who is onsite or in another category that day. Use the arrow keys to move between dates.</p>
               <p>Drag or Shift-click to select weekdays in your row. Double-click inside the selection to edit the whole range. Admins can also select and edit a colleague’s row.</p>
               <p><kbd>Ctrl+C</kbd> copies the selection. Select the first destination day and press <kbd>Ctrl+V</kbd> to paste.</p>
@@ -256,8 +261,14 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
           </Popover>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center rounded-lg border bg-white" aria-label="Month navigation">
+          <button type="button" aria-label="Previous month" className="grid size-9 place-items-center rounded-l-lg text-slate-600 hover:bg-slate-100" onClick={()=>jump(new Date(period.year,period.month-2,1))}><ChevronLeft size={17} aria-hidden="true"/></button>
+          <span className="min-w-[8.5rem] px-2 text-center text-sm font-semibold tabular-nums">{monthLabel}</span>
+          <button type="button" aria-label="Next month" className="grid size-9 place-items-center rounded-r-lg text-slate-600 hover:bg-slate-100" onClick={()=>jump(new Date(period.year,period.month,1))}><ChevronRight size={17} aria-hidden="true"/></button>
+        </div>
+        <button type="button" className="rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={()=>jump(new Date())}>Today</button>
         <Popover>
-          <PopoverTrigger className="rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Filters</PopoverTrigger>
+          <PopoverTrigger className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><SlidersHorizontal size={15} aria-hidden="true"/>Filters{filterCount>0&&<span className="rounded bg-slate-200 px-1.5 text-xs">{filterCount}</span>}</PopoverTrigger>
           <PopoverContent align="end" aria-label="Schedule filters" className="w-[32rem] max-w-[calc(100vw_-_2rem)] space-y-4 bg-white text-slate-800">
             <h3 className="text-sm font-semibold">Schedule filters</h3>
             <div className="grid grid-cols-2 gap-3" aria-label="Schedule filters">
@@ -279,25 +290,40 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
             </div>
           </PopoverContent>
         </Popover>
-        <div className="flex flex-wrap gap-1" aria-label="Schedule view">
-          <button type="button" aria-pressed={personId===user.id&&sector==='all'} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>{setSector('all');setPersonId(user.id);setEditUserId(user.id);setSelection(null);}}>My schedule</button>
-          <button type="button" aria-pressed={personId==='all'&&sector==='all'} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>{setSector('all');setPersonId('all');setSelection(null);}}>Team schedule</button>
-        </div>
-        <button className="text-sm border rounded-lg px-3 py-2 text-blue-700" onClick={()=>jump(new Date())}>Today</button>
-        <button type="button" disabled={!canEdit||!onUndo} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" onClick={()=>{setSelectionMessage('');onUndo?.();}}>Undo</button>
-        <button type="button" disabled={!canEdit||!selectedDates.length} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" onClick={clearSelectedDays}>Clear days</button>
-        {canEdit&&allowTeamEdit&&user.role==='admin'&&<label className="text-xs text-slate-600">Edit team member <select className="ml-2 rounded-md border px-2 py-2 text-sm" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
-        {canEdit&&<button aria-disabled={!canEdit} onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 aria-disabled:opacity-40">Set date range</button>}
       </div>
     </div>
-    <p className="px-4 pb-3 text-xs text-slate-600">Select weekdays in your row, then choose Set date range. On a phone, use Set date range to enter the start and end dates.</p>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg bg-slate-100 p-1" aria-label="Schedule view">
+          <button type="button" aria-pressed={personId==='all'&&sector==='all'} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(personId==='all'&&sector==='all'?'bg-white text-slate-900 shadow-sm':'text-slate-600 hover:text-slate-900')} onClick={()=>{setSector('all');setPersonId('all');setSelection(null);}}>Team schedule</button>
+          {showMySchedule&&<button type="button" aria-pressed={personId===user.id&&sector==='all'} className={'rounded-md px-3 py-1.5 text-xs font-medium '+(personId===user.id&&sector==='all'?'bg-white text-slate-900 shadow-sm':'text-slate-600 hover:text-slate-900')} onClick={()=>{setSector('all');setPersonId(user.id);setEditUserId(user.id);setSelection(null);}}>My schedule</button>}
+        </div>
+        <span className="text-xs text-slate-500">{members.length} {members.length===1?'team member':'team members'}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {canEdit&&isAdminEditor&&<label className="flex items-center gap-2 text-xs text-slate-600">Edit <select aria-label="Edit team member" className="max-w-[12rem] rounded-md border bg-white px-2 py-1.5 text-sm text-slate-800" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);setSelectionMessage('');}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
+        {canEdit&&onUndo&&<button type="button" className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs text-slate-700 hover:bg-slate-50" onClick={()=>{setSelectionMessage('');onUndo();}}><Undo2 size={14} aria-hidden="true"/>Undo</button>}
+        {canEdit&&<button type="button" onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800">{selectedDates.length?'Edit selection':'Set date range'}</button>}
+      </div>
+    </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-[11px] text-slate-600" aria-label="Schedule legend">
+      {SCHEDULE_CATEGORIES.map(([status,label,color,code])=><span key={status} className={'inline-flex items-center gap-1.5 '+(!categories.includes(status)?'opacity-50':'')} title={'Calendar code: '+code}><span aria-hidden="true" className="size-2.5 rounded-sm" style={{backgroundColor:color}}/>{label}</span>)}
+      <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-sm border border-slate-300 bg-white"/>{OFF_PROJECT_LABEL}</span>
+      <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-sm border border-slate-300" style={{backgroundColor:WEEKEND_COLOR}}/>Weekend</span>
+    </div>
+    {(selectedDates.length>0||selectionMessage)&&<div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-900">
+      {selectedDates.length>0&&<><span className="font-medium">{editPerson?.name} · {display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>
+      <button type="button" disabled={!canEdit} className="rounded-md border border-blue-200 bg-white px-2.5 py-1.5 hover:bg-blue-100 disabled:opacity-50" onClick={clearSelectedDays}>Clear days</button>
+      <button type="button" aria-label="Deselect dates" className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-blue-100" onClick={()=>{setSelection(null);setSelectionMessage('');}}><X size={14} aria-hidden="true"/>Deselect</button></>}
+      {selectionMessage&&<span role="status">{selectionMessage}</span>}
+    </div>}
     <div ref={viewport} onScroll={extendTimeline} onCopy={copySelection} onPaste={pasteSelection} onKeyDown={handleCalendarKey}
       onPointerUp={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerCancel={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerLeave={()=>{dragAnchor.current=null;dragPerson.current=null;}}
-      className="overflow-auto max-h-[55vh] border-t [scrollbar-gutter:stable]" role="region" aria-label="Continuous schedule timeline" tabIndex={0}>
+      className="overflow-auto max-h-[65vh] border-t [scrollbar-gutter:stable]" role="region" aria-label="Continuous schedule timeline" tabIndex={0}>
       <table className="text-xs" aria-label="Continuous team schedule" style={{tableLayout:'fixed',borderCollapse:'separate',borderSpacing:0,width:nameWidth+months.length*monthWidth}}>
         <colgroup><col style={{width:nameWidth}}/>{dates.map((date,index)=><col key={date} style={{width:columnWidths[index]}}/>)}</colgroup>
         <thead className="sticky top-0 z-30"><tr>
-          <th scope="col" rowSpan={2} className="p-2 text-left sticky left-0 bg-white z-40 border-r border-b">Team member</th>
+          <th scope="col" rowSpan={2} className="p-3 text-left sticky left-0 bg-slate-50 z-40 border-r border-b border-slate-200 font-semibold text-slate-700">Team member</th>
           {months.map(m=><th key={m.key} scope="colgroup" colSpan={m.dates.length} className="bg-slate-50 text-left border-r border-b py-1.5"><span className="sticky block w-fit px-2 font-semibold text-slate-700" style={{left:nameWidth}}>{m.label}</span></th>)}
         </tr><tr>
           {dates.map((date,index)=>{
@@ -319,18 +345,18 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
             </th>;
           })}
         </tr></thead>
-        <tbody>{members.map(person=>{const tag=tags.find(t=>t.id===person.tagId);return <tr key={person.id}>
-          <th scope="row" className="font-normal p-2 whitespace-nowrap sticky left-0 bg-white z-20 text-left border-r border-b truncate" title={person.name}><span className="block truncate">{person.name}</span><span className="inline-block max-w-full truncate align-top mt-1 rounded-full px-1.5 py-0.5 text-[10px]" title={tag?.name} style={tag?{backgroundColor:tag.color,color:tagTextColor(tag.color)}:{backgroundColor:'#F1F5F9',color:'#64748B'}}>{tag?.name||'Unassigned'}</span></th>
+        <tbody>{members.map((person,rowIndex)=>{const tag=tags.find(t=>t.id===person.tagId),groupStart=rowIndex>0&&members[rowIndex-1].tagId!==person.tagId;const rowColor=person.id===user.id?'#F0F6FF':rowIndex%2?'#FAFBFC':'#FFFFFF';return <tr key={person.id} style={{backgroundColor:rowColor}}>
+          <th scope="row" className={'sticky left-0 z-20 truncate whitespace-nowrap border-r border-b border-slate-200 px-2.5 py-1.5 text-left font-normal '+(groupStart?'border-t-2 border-t-slate-300':'')} style={{backgroundColor:rowColor}} title={person.name}><span className={'block truncate '+(person.id===user.id?'font-semibold text-blue-900':'font-medium text-slate-800')}>{person.name}</span><span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500" title={tag?.name||'Unassigned'}>{tag&&<span className="size-2 shrink-0 rounded-sm" style={{backgroundColor:tag.color}} aria-hidden="true"/>}<span className="truncate">{tag?.name||'Unassigned'}</span></span></th>
           {dates.map(date=>{
             const isToday=date===today;
             const weekend=isWeekend(date),entry=resolveScheduleDay(schedule,presence,person.id,date),category=SCHEDULE_CATEGORIES.find(c=>c[0]===entry?.status);
             const editable=!weekend&&ready&&(person.id===user.id||allowTeamEdit&&user.role==='admin'),selected=editable&&person.id===editUserId&&start&&date>=start&&date<=end;
-            const description=weekend?'Weekend':category?.[1]||'No entry';
+            const description=weekend?'Weekend':category?.[1]||OFF_PROJECT_LABEL;
             const detail=entry?.source==='hotel'?' · From hotel request':'';
             const cellStyle=isToday
               ? {backgroundColor:weekend?WEEKEND_COLOR:'#EFF6FF',boxShadow:todayColumnEdge}
               : weekend?{backgroundColor:WEEKEND_COLOR}:undefined;
-            return <td className={'py-1 border-b '+(monthStarts.has(date)?'schedule-month-start':'')}
+            return <td className={'py-1 border-b border-slate-100 '+(groupStart?'border-t-2 border-t-slate-300 ':'')+(monthStarts.has(date)?'schedule-month-start':'')}
               style={selected?{backgroundColor:'#DBEAFE',boxShadow:'inset 0 1px #2563EB, inset 0 -1px #2563EB'}:cellStyle} key={date}
               onPointerEnter={editable?event=>{
                 if (canEdit&&event.pointerType==='mouse'&&event.buttons===1&&dragAnchor.current&&dragPerson.current===person.id) {
@@ -347,7 +373,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
               data-schedule-status={entry?.status||''}
               data-editable-date={editable?date:undefined}
               className={'block mx-auto rounded h-9 sm:h-6 w-[calc(100%_-_4px)] max-w-8 text-[10px] font-semibold select-none '+(category?'text-white':selected?'text-blue-700':'text-slate-400')}
-              style={{backgroundColor:weekend?WEEKEND_COLOR:category?.[2]||(selected||isToday?'transparent':'#FFFFFF'),opacity:category&&!categories.includes(category[0])?0.2:1,cursor:editable?undefined:'default'}}
+              style={{backgroundColor:weekend?WEEKEND_COLOR:category?.[2]||'transparent',opacity:category&&!categories.includes(category[0])?0.2:1,cursor:editable?undefined:'default'}}
               onMouseDown={event=>{
                 if (!canEdit||event.button!==0) return;
                 // The first click selects one cell. Retain the original range for a double-click.
@@ -366,16 +392,12 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
                 } else openDateRange(date,date,person.id);
               }}
               onKeyDown={event=>moveSelection(event,date,person.id)}
-            >{weekend?null:category?(showCodes?category[3]:null):'·'}</button></td>;
+            >{weekend?null:category?(showCodes?category[3]:null):null}</button></td>;
           })}
         </tr>;})}</tbody>
       </table>
       {!members.length&&<p className="p-6 text-sm text-slate-500">No team members to display yet.</p>}
     </div>
-    {(selectedDates.length>0||selectionMessage)&&<div className="flex flex-wrap items-center gap-2 border-t px-4 py-2 text-xs text-blue-800">
-      {selectedDates.length>0&&<span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium">{display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>}
-      {selectedDates.length>0&&<button type="button" className="underline" onClick={()=>{setSelection(null);setSelectionMessage('');}}>Deselect</button>}{selectionMessage&&<span role="status">{selectionMessage}</span>}
-    </div>}
   </section><CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} trips={countryTrips} period={period} limited={countryLimited}/><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}
   </div>;
