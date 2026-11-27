@@ -185,18 +185,20 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
       setSelectionMessage(error instanceof PlannerError?error.message:'Select the first destination day and press Ctrl+V to paste.');
     }
   }
+  async function clearSelectedDays() {
+    if (!canEdit||!selectedDates.length) return;
+    setSelectionMessage('');
+    const changes=selectedDates.map(date=>({date,status:resolveScheduleDay({},presence,editUserId,date)?SCHEDULE_BLANK:'clear'}));
+    const count=await onChange(changes,editUserId);
+    if(count)setSelectionMessage('Selected weekdays cleared.');
+  }
   async function handleCalendarKey(event) {
     if (event.key!=='Delete'&&event.key!=='Backspace') return;
     if (event.target.closest?.('thead')) return;
     if (!selectedDates.length||event.ctrlKey||event.metaKey||event.altKey) return;
     event.preventDefault();
     if (!canEdit||event.repeat) return;
-    setSelectionMessage('');
-    const changes=selectedDates.map(date=>({
-      date,status:resolveScheduleDay({},presence,editUserId,date)?SCHEDULE_BLANK:'clear',
-    }));
-    const count=await onChange(changes,editUserId);
-    if (count) setSelectionMessage('Selected weekdays cleared.');
+    await clearSelectedDays();
   }
   useEffect(()=>{
     if (!onUndo||selectedDay) return;
@@ -239,7 +241,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
   return <div className="space-y-4"><section className="bg-white border rounded-xl overflow-hidden isolate">
     <div className="flex flex-wrap justify-between items-center gap-3 p-4">
       <div className="flex items-center gap-2">
-          <h2 className="font-medium">Team schedule</h2>
+          <h2 className="font-medium">Schedule</h2>
           <Popover>
             <PopoverTrigger aria-label="Schedule help" className="inline-grid size-5 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700">?</PopoverTrigger>
             <PopoverContent align="start" aria-label="Schedule help" className="max-w-[calc(100vw_-_2rem)] space-y-2 bg-white text-xs text-slate-700">
@@ -277,11 +279,18 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
             </div>
           </PopoverContent>
         </Popover>
+        <div className="flex flex-wrap gap-1" aria-label="Schedule view">
+          <button type="button" aria-pressed={personId===user.id&&sector==='all'} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>{setSector('all');setPersonId(user.id);setEditUserId(user.id);setSelection(null);}}>My schedule</button>
+          <button type="button" aria-pressed={personId==='all'&&sector==='all'} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>{setSector('all');setPersonId('all');setSelection(null);}}>Team schedule</button>
+        </div>
         <button className="text-sm border rounded-lg px-3 py-2 text-blue-700" onClick={()=>jump(new Date())}>Today</button>
+        <button type="button" disabled={!canEdit||!onUndo} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" onClick={()=>{setSelectionMessage('');onUndo?.();}}>Undo</button>
+        <button type="button" disabled={!canEdit||!selectedDates.length} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" onClick={clearSelectedDays}>Clear days</button>
         {canEdit&&allowTeamEdit&&user.role==='admin'&&<label className="text-xs text-slate-600">Edit team member <select className="ml-2 rounded-md border px-2 py-2 text-sm" value={editUserId} onChange={event=>{setEditUserId(event.target.value);setSelection(null);}}>{team.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>}
         {canEdit&&<button aria-disabled={!canEdit} onClick={()=>openDateRange(start,end)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 aria-disabled:opacity-40">Set date range</button>}
       </div>
     </div>
+    <p className="px-4 pb-3 text-xs text-slate-600">Select weekdays in your row, then choose Set date range. On a phone, use Set date range to enter the start and end dates.</p>
     <div ref={viewport} onScroll={extendTimeline} onCopy={copySelection} onPaste={pasteSelection} onKeyDown={handleCalendarKey}
       onPointerUp={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerCancel={()=>{dragAnchor.current=null;dragPerson.current=null;}} onPointerLeave={()=>{dragAnchor.current=null;dragPerson.current=null;}}
       className="overflow-auto max-h-[55vh] border-t [scrollbar-gutter:stable]" role="region" aria-label="Continuous schedule timeline" tabIndex={0}>
@@ -337,7 +346,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
               data-schedule-source={entry?.source||''}
               data-schedule-status={entry?.status||''}
               data-editable-date={editable?date:undefined}
-              className={'block mx-auto rounded h-6 w-[calc(100%_-_4px)] max-w-8 text-[10px] font-semibold select-none '+(category?'text-white':selected?'text-blue-700':'text-slate-400')}
+              className={'block mx-auto rounded h-9 sm:h-6 w-[calc(100%_-_4px)] max-w-8 text-[10px] font-semibold select-none '+(category?'text-white':selected?'text-blue-700':'text-slate-400')}
               style={{backgroundColor:weekend?WEEKEND_COLOR:category?.[2]||(selected||isToday?'transparent':'#FFFFFF'),opacity:category&&!categories.includes(category[0])?0.2:1,cursor:editable?undefined:'default'}}
               onMouseDown={event=>{
                 if (!canEdit||event.button!==0) return;
@@ -365,7 +374,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
     </div>
     {(selectedDates.length>0||selectionMessage)&&<div className="flex flex-wrap items-center gap-2 border-t px-4 py-2 text-xs text-blue-800">
       {selectedDates.length>0&&<span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium">{display(start)}{end!==start&&' – '+display(end)} · {selectedDates.length} {selectedDates.length===1?'weekday':'weekdays'}</span>}
-      {selectionMessage&&<span role="status">{selectionMessage}</span>}
+      {selectedDates.length>0&&<button type="button" className="underline" onClick={()=>{setSelection(null);setSelectionMessage('');}}>Deselect</button>}{selectionMessage&&<span role="status">{selectionMessage}</span>}
     </div>}
   </section><CountryDays people={countryLimited?members.filter(p=>p.id===user.id):members} trips={countryTrips} period={period} limited={countryLimited}/><ScheduleTotals rows={totals} categories={categories} year={period.year} month={period.month} tags={tags}/>
     {selectedDay&&<ScheduleDay key={selectedDay} date={selectedDay} people={team} tags={tags} schedule={schedule} presence={presence} userId={user.id} onClose={()=>setSelectedDay(null)}/>}

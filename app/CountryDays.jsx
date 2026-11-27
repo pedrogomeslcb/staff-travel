@@ -1,5 +1,6 @@
 import {useMemo} from 'react';
-import {annualLimit,countryMonths,yearCounts} from '../lib/country-days.mjs';
+import {iso} from '../lib/planner.mjs';
+import {annualLimit,countryMonths,yearCounts,countryYearBreakdown} from '../lib/country-days.mjs';
 
 export default function CountryDays({people,trips,period,limited}){
   const counts=useMemo(()=>countryMonths(trips),[trips]);
@@ -8,11 +9,11 @@ export default function CountryDays({people,trips,period,limited}){
     <summary className="cursor-pointer font-semibold">Days in country · {period.year}</summary>
     <p className="my-3 text-xs text-slate-600">Based on active flight dates, including planned trips, weekends, arrival and departure days. Overlapping dates count once.</p>
     {limited&&<p role="status">Only your own flight dates are available until team flight dates are enabled.</p>}
-    <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr>{['Team member',month,String(period.year),'Annual allowance'].map(label=><th className="p-2" key={label}>{label}</th>)}</tr></thead>
+    <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr>{['Team member',month,'Completed','Planned',String(period.year),'Annual allowance'].map(label=><th className="p-2" key={label}>{label}</th>)}</tr></thead>
     <tbody>{people.map(person=>{
       const months=yearCounts(counts.get(person.id),period.year);
-      const total=months.reduce((a,b)=>a+b,0);
-      return <tr className="border-t" key={person.id}><th scope="row" className="p-2">{person.name}</th><td className="p-2">{months[period.month-1]}</td><td className="p-2">{total}</td><td className={'p-2 '+(total>=annualLimit?'font-semibold text-amber-800':'')}>{total>annualLimit?(total-annualLimit)+' over limit':total===annualLimit?'90-day limit reached':(annualLimit-total)+' days left'}</td></tr>;
+      const {total,completed,planned}=countryYearBreakdown(trips,person.id,period.year,iso(new Date()));
+      return <tr className="border-t" key={person.id}><th scope="row" className="p-2">{person.name}</th><td className="p-2">{months[period.month-1]}</td><td className="p-2">{completed}</td><td className="p-2">{planned}</td><td className="p-2">{total}</td><td className={'p-2 '+(total>=75?'font-semibold text-amber-800':'')}>{total>annualLimit?(total-annualLimit)+' over limit':total===annualLimit?'90-day limit reached':(annualLimit-total)+' days left'+(total>=85?' · Near limit':total>=75?' · Monitor':'')}</td></tr>;
     })}</tbody></table></div>
   </details>;
 }
