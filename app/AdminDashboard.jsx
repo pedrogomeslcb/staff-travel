@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
-import {CalendarDays,Plane,Hotel,Car,RefreshCw,ArrowRight,CheckCircle2,AlertCircle} from 'lucide-react';
+import {CalendarDays,Plane,Hotel,RefreshCw,ArrowRight,CheckCircle2,AlertCircle} from 'lucide-react';
 import {iso,display} from '../lib/planner.mjs';
 import {buildAdminDashboard} from '../lib/admin-dashboard.mjs';
 import {activityLabels} from './TravelAudit';
@@ -21,6 +21,7 @@ export default function AdminDashboard({user,repo,trips,people,schedule,presence
     return ()=>{active=false;};
   },[repo,user.id,reload,trips,schedule,allocations,drivers]);
   async function refresh(){setReloading(true);try{await onRefresh();}finally{setReload(v=>v+1);setReloading(false);}}
+  const todaysEvents=events.filter(e=>e.at&&iso(new Date(e.at))===today);
   if(user.role!=='admin')return null;
   return <div className="space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Admin dashboard</h2><p className="text-sm text-slate-600">{new Date(today+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'})}</p></div><button type="button" disabled={busy||reloading||!ready} onClick={refresh} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-slate-700 disabled:opacity-50"><RefreshCw size={15} aria-hidden="true"/>{reloading?'Refreshing…':'Refresh'}</button></header>
@@ -49,8 +50,9 @@ export default function AdminDashboard({user,repo,trips,people,schedule,presence
           {scheduleReady&&<details className="mt-4 border-t pt-3 text-sm"><summary className="cursor-pointer font-medium">Onsite team · {data.onsite.length}</summary><ul className="mt-2 space-y-1 text-xs text-slate-600">{data.onsite.map(p=><li key={p.id}>{p.name}</li>)}</ul></details>}
         </div>
         <div className="rounded-xl border bg-white p-4"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Recent activity</h3><button type="button" className={link} onClick={onLogs}>View logs</button></div>
+          {!loading&&!logError&&<div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">{[['Requests received','hotel_created'],['Hotel requests sent','hotel_requested'],['Confirmations recorded','hotel_confirmed'],['Transfer updates','transfer_updated'],['Cancellation notices','hotel_notified'],['Other changes',null]].map(([label,kind])=><div key={label}><p className="font-semibold text-lg tabular-nums text-slate-900">{todaysEvents.filter(e=>kind?e.kind===kind:!['hotel_created','hotel_requested','hotel_confirmed','transfer_updated','hotel_notified'].includes(e.kind)).length}</p>{label}</div>)}<p className="col-span-2 text-[11px] text-slate-500">Today · recorded activity, not unique requests.</p></div>}
           {loading&&<p className="mt-3 text-sm text-slate-500">Loading activity…</p>}{logError&&<p role="alert" className="mt-3 text-sm text-red-700">{logError}</p>}
-          {!loading&&!logError&&(!events.length?<p className="mt-3 text-sm text-slate-500">No recorded activity.</p>:<ol className="mt-2 divide-y">{events.slice(0,8).map(e=><li key={e.id} className="py-2.5"><p className="text-sm font-medium">{activityLabels[e.kind]||e.kind}</p><p className="text-xs text-slate-600">{e.actorName}{e.personName&&e.personName!==e.actorName?' · '+e.personName:''}</p><p className="text-xs text-slate-500">{new Date(e.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})}</p></li>)}</ol>)}
+          {!loading&&!logError&&(!events.length?<p className="mt-3 text-sm text-slate-500">No recorded activity.</p>:<ol className="mt-2 divide-y">{events.slice(0,8).map(e=><li key={e.id} className="py-2.5"><p className="text-sm font-medium">{activityLabels[e.kind]||e.kind}</p><p className="text-xs text-slate-600">By {e.actorName}{e.personName&&e.personName!==e.actorName?' · For '+e.personName:''}</p>{e.trip?.checkin&&<p className="text-xs text-slate-600">{display(e.trip.checkin)} – {display(e.trip.checkout)}</p>}{e.changes?.length>0&&<p className="text-xs text-slate-600">Changed: {e.changes.slice(0,3).map(c=>c.label).join(', ')}{e.changes.length>3?'…':''}</p>}<p className="text-xs text-slate-500">{new Date(e.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})}</p></li>)}</ol>)}
         </div>
       </section>
     </div></>}

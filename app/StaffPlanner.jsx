@@ -18,6 +18,7 @@ import Transfers from './Transfers';
 import {DRIVERS} from '../lib/transfers.mjs';
 import UsersAccess from './UsersAccess';
 import TravelAudit from './TravelAudit';
+import AdminDashboard from './AdminDashboard';
 import Database from './Database';
 
 const input='w-full border border-slate-300 rounded-lg p-2.5 bg-white text-sm text-slate-800';
@@ -93,7 +94,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [name,setName]=useState(loginName),[password,setPassword]=useState(''),[user,setUser]=useState(initialUser);
   const [people,setPeople]=useState([]),[trips,setTrips]=useState([]),[schedule,setSchedule]=useState({});
   const [sharedScheduleReady,setSharedScheduleReady]=useState(!connected);
-  const [tab,setTab]=useState('overview'),[modal,setModal]=useState(false),[editing,setEditing]=useState(null),[trip,setTrip]=useState({...blank});
+  const [tab,setTab]=useState(initialUser?.role==='admin'?'admin':'overview'),[modal,setModal]=useState(false),[editing,setEditing]=useState(null),[trip,setTrip]=useState({...blank});
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[drafts,setDrafts]=useState({}),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [month,setMonth]=useState(()=>new Date()),[scheduleEdit,setScheduleEdit]=useState(null);
   const [hotelName,setHotelName]=useState('');
@@ -104,6 +105,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [userTravelFilter,setUserTravelFilter]=useState('upcoming');
   const [requestUserId,setRequestUserId]=useState(initialUser?.id||'');
   const [scheduleWarning,setScheduleWarning]=useState(null),[hotelFilter,setHotelFilter]=useState('active');
+  const [adminSection,setAdminSection]=useState('dashboard'),[hotelFocusId,setHotelFocusId]=useState(null),[transferFocusKey,setTransferFocusKey]=useState(null);
   const [removing,setRemoving]=useState(null),[acknowledgeHotel,setAcknowledgeHotel]=useState(false);
   const saving=useRef(false),userRef=useRef(initialUser),scheduleHistory=useRef([]),requestUserIdRef=useRef(initialUser?.id||'');
   userRef.current=user;
@@ -123,12 +125,12 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     setTransferPassengersReady(!connected||snapshot.transferPassengersReady===true);
     const verified=connected?initialUser:snapshot.currentUser;
     userRef.current=verified;setUser(verified);
-    if(verified?.role!=='admin')setTab(previous=>['access','audit'].includes(previous)?'planner':previous);
+    if(verified?.role!=='admin')setTab(previous=>['admin','access','audit'].includes(previous)?'overview':previous);
   }
   function clearSession() {
     scheduleHistory.current=[];
     setTransferAllocations({});setTransferPassengersReady(!connected);
-    setScheduleWarning(null);setHotelFilter('active');setHotelName('');setRequestUserId('');requestUserIdRef.current='';setSharedScheduleReady(!connected);
+    setScheduleWarning(null);setHotelFilter('active');setHotelName('');setHotelFocusId(null);setTransferFocusKey(null);setAdminSection('dashboard');setRequestUserId('');requestUserIdRef.current='';setSharedScheduleReady(!connected);
     userRef.current=null;setUser(null);setTrips([]);setPeople([]);setSchedule({});setTags([]);setUsers([]);setPresence([]);setTransferTrips([]);setDrafts({});setModal(false);setScheduleEdit(null);setRemoving(null);setProfileMembership(null);setTab('overview');
   }
   async function refresh(actor=userRef.current) {const snapshot=await repo.snapshot(actor);applySnapshot(snapshot);}
@@ -146,8 +148,10 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   useEffect(()=>{
     if(!user?.id||!database)return;
     let active=true;
-    database.references().then(data=>{if(active)setReferences(data);}).catch(()=>{});
-    return ()=>{active=false;};
+    function loadReferences(){database.references().then(data=>{if(active)setReferences(data);}).catch(()=>{});}
+    loadReferences();
+    window.addEventListener('focus',loadReferences);
+    return ()=>{active=false;window.removeEventListener('focus',loadReferences);};
   },[database,user?.id]);
   useEffect(()=>{
     if(!connected||!modal)return;
@@ -168,7 +172,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
 
   async function login(e) {
     e.preventDefault();if(saving.current)return;saving.current=true;setBusy(true);setError('');
-    try {const person=await repo.login(name,password);userRef.current=person;await refresh(person);setMonth(new Date());setTab('overview');setMessage('');}
+    try {const person=await repo.login(name,password);userRef.current=person;await refresh(person);setMonth(new Date());setAdminSection('dashboard');setTab(person.role==='admin'?'admin':'overview');setMessage('');}
     catch(e){clearSession();setError(e.message);}
     finally{setPassword('');saving.current=false;setBusy(false);}
   }
@@ -342,8 +346,23 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     ?[...new Map([user,...users].filter(Boolean).map(person=>[person.id,{id:person.id,name:person.name||person.username||'Staff'}])).values()]
       .sort((a,b)=>a.name.localeCompare(b.name))
     :[];
+  function navigate(section){
+    setError('');setHotelFocusId(null);setTransferFocusKey(null);
+    setTab(section);
+    if(section==='admin')setAdminSection('dashboard');
+  }
+  function openAdminHotel(id){
+    setHotelFocusId(id);setHotelName('');setHotelFilter('all');setError('');setTab('travel');
+  }
+  function openAdminTransfer(key){
+    setTransferFocusKey(key);setError('');setTab('transport');
+  }
+  async function refreshAdmin(){
+    try{await refresh();if(database)setReferences(await database.references());}catch(e){accessError(e);}
+  }
   const visibleTrips=trips.filter(t=>{
     if(user?.role!=='admin')return t.userId===user?.id&&(userTravelFilter==='all'||(userTravelFilter==='past'?Boolean(t.canceledAt||t.archivedAt||(t.returnDate||t.checkout)<iso(new Date())):!t.canceledAt&&!t.archivedAt&&(t.returnDate||t.checkout)>=iso(new Date())));
+    if(hotelFocusId&&t.id!==hotelFocusId)return false;
     if(hotelName && t.person!==hotelName)return false;
     if(hotelFilter==='all')return true;
     if(hotelFilter==='archived'||t.archivedAt)return hotelFilter==='archived'&&Boolean(t.archivedAt);
@@ -382,23 +401,29 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     ?<SupabaseUsersAccess client={supabaseClient} currentUser={user} onChange={()=>refresh()}/>
     :<UsersAccess users={users} tags={tags} currentUser={user} shared={shared} busy={busy} onAction={accessAction}/>);
   if(!user)return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><form onSubmit={login} className="bg-white border rounded-2xl p-8 w-full max-w-md space-y-5 shadow-sm"><h1 className="text-2xl font-bold text-blue-900">Staff & Travel</h1><p className="text-sm text-slate-500">Team planning and travel workspace</p><label className="block text-sm">Full name<input required readOnly={shared} autoComplete="username" maxLength={120} className={input+' mt-1'} value={name} onChange={e=>setName(e.target.value)}/></label><label className="block text-sm">Password<input required type="password" autoComplete="current-password" maxLength={128} className={input+' mt-1'} value={password} onChange={e=>setPassword(e.target.value)}/></label><button disabled={!ready||busy} className={button+' w-full'}>{!ready?'Preparing accounts…':busy?'Signing in…':'Sign in'}</button>{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}<p className="text-xs text-slate-500">Accounts start with the temporary password <strong>test</strong>, unless an admin has changed it.</p>{!shared&&<p className="text-xs bg-amber-50 p-3 rounded text-amber-900">Local demo only. For initial admin access, use admin / test. Password and access controls are for testing; data stays in this browser. Use fictional data. No bookings or emails are sent.</p>}</form></div>;
-  return <div className="min-h-screen bg-slate-50 text-slate-800"><header className="bg-white border-b p-3 sm:p-5 flex flex-wrap gap-3 justify-between"><h1 className="text-xl font-bold text-blue-900">Staff Planner</h1><div className="flex flex-wrap gap-3 items-center text-sm">{user.role==='admin'&&<button disabled={!ready||busy} onClick={exportExcel} className="text-blue-700">Export to Excel</button>}<span>{user.name} · {user.role==='admin'?'Admin':'User'}</span><button disabled={busy} onClick={logout}>Sign out</button></div></header>{!connected&&<p className="bg-amber-50 text-amber-900 text-xs px-6 py-2">{shared?'Team workspace · Use local times for each location · No bookings or emails are sent':'Local demo only · Data stays in this browser · Passwords and permissions are for testing'}</p>}<main className={'mx-auto p-4 sm:p-6 '+(tab==='planner'?'max-w-[112rem]':'max-w-6xl')}><div className="flex flex-wrap justify-between gap-4 mb-6"><nav className="flex flex-wrap gap-2" aria-label="Workspace sections">{[['overview','Overview'],['planner','Schedule'],['travel','Hotel & flights'],['transport','Transfers'],...(connected?[['profile','My profile']]:[]),...(user.role==='admin'?[['access',database?'Database':'Users & access'],['audit','Logs']]:[])].map(([key,label])=><button key={key} onClick={()=>{setTab(key);setError('');}} aria-current={tab===key?'page':undefined} className={'rounded-xl px-4 py-3 text-sm '+(tab===key?'bg-white shadow text-blue-700':'text-slate-500')}>{label}</button>)}</nav>{['travel','transport'].includes(tab)&&<button disabled={!ready||busy} className={button} onClick={()=>open(null)}>Plan a trip</button>}</div>{connected&&ready&&['planner','overview'].includes(tab)&&!sharedScheduleReady&&<p role="alert" className="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm mb-4">
+  return <div className="min-h-screen bg-slate-50 text-slate-800"><header className="bg-white border-b p-3 sm:p-5 flex flex-wrap gap-3 justify-between"><h1 className="text-xl font-bold text-blue-900">Staff Planner</h1><div className="flex flex-wrap gap-3 items-center text-sm">{user.role==='admin'&&<button disabled={!ready||busy} onClick={exportExcel} className="text-blue-700">Export to Excel</button>}<span>{user.name} · {user.role==='admin'?'Admin':'User'}</span><button disabled={busy} onClick={logout}>Sign out</button></div></header>{!connected&&<p className="bg-amber-50 text-amber-900 text-xs px-6 py-2">{shared?'Team workspace · Use local times for each location · No bookings or emails are sent':'Local demo only · Data stays in this browser · Passwords and permissions are for testing'}</p>}<main className={'mx-auto p-4 sm:p-6 '+(tab==='planner'?'max-w-[112rem]':'max-w-6xl')}><div className="flex flex-wrap justify-between gap-4 mb-6"><nav className="flex flex-wrap gap-2" aria-label="Workspace sections">{[['overview','Overview'],['planner','Schedule'],['travel','Hotel & flights'],['transport','Transfers'],...(connected?[['profile','My profile']]:[]),...(user.role==='admin'?[['admin','Admin']]:[])].map(([key,label])=><button key={key} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined} className={'rounded-xl px-4 py-3 text-sm '+(tab===key?'bg-white shadow text-blue-700':'text-slate-500')}>{label}</button>)}</nav>{['travel','transport'].includes(tab)&&<button disabled={!ready||busy} className={button} onClick={()=>open(null)}>Plan a trip</button>}</div>{connected&&ready&&['planner','overview'].includes(tab)&&!sharedScheduleReady&&<p role="alert" className="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm mb-4">
         Team Schedule is not synchronized. The dates currently visible may be saved only in this browser and cannot be seen by teammates. An administrator must run <a className="underline font-medium" target="_blank" rel="noopener noreferrer" href="https://github.com/pedrogomeslcb/staff-travel/blob/main/supabase/shared-schedule.sql">shared-schedule.sql</a> in the Supabase SQL Editor, then reload. Existing local dates in this browser will be imported without overwriting shared entries.
       </p>}{message&&<div className="mb-4 flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900"><p role="status" className="min-w-0 flex-1">{message}</p><button type="button" aria-label="Dismiss notification" title="Dismiss notification" className="inline-grid size-8 shrink-0 place-items-center rounded-md text-lg leading-none hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-700" onClick={()=>setMessage('')}>×</button></div>}{error&&!modal&&!scheduleEdit&&!scheduleWarning&&!removing&&<p role="alert" className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">{error}</p>}{!ready&&<p className="text-sm text-slate-500">Loading workspace…</p>}
 
-    {tab==='overview'&&<><Overview user={user} people={people} trips={trips} countryTrips={countryTrips} countryLimited={countryLimited} schedule={schedule} presence={presence} transferTrips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} passengersReady={transferPassengersReady} ready={ready} busy={busy} onPlan={()=>open(null)} onEdit={open} onNavigate={setTab}/></>}
+    {tab==='overview'&&<><Overview user={user} people={people} trips={trips} countryTrips={countryTrips} countryLimited={countryLimited} schedule={schedule} presence={presence} transferTrips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} passengersReady={transferPassengersReady} ready={ready} busy={busy} onPlan={()=>open(null)} onEdit={open} onNavigate={navigate}/></>}
     {tab==='profile'&&connected&&<section className="max-w-xl space-y-4 rounded-xl border bg-white p-5"><h2 className="font-semibold">My profile</h2><p className="text-sm">{user.name} · {user.username||'Username not available'}</p><form className="space-y-3" onSubmit={e=>{e.preventDefault();void mutate(async()=>{const data=await database.saveOwnMembership(profileMembership??references?.membership??'');setReferences(data);setProfileMembership(null);setMessage('IHG membership saved.');});}}><label className="block text-sm">IHG membership (optional)<input className={input+' mt-1'} maxLength={64} disabled={!references||busy} value={profileMembership??references?.membership??''} onChange={e=>setProfileMembership(e.target.value)}/></label><p className="text-xs text-slate-600">Used to prefill future hotel requests. Leave blank to remove it. Existing hotel requests are not changed.</p><button className={button} disabled={!references||busy||profileMembership===null}>Save membership</button></form></section>}
-    {tab==='travel'&&<div className="space-y-5">{user.role!=='admin'&&<div className="flex flex-wrap gap-2" aria-label="Trip history">{[['upcoming','Upcoming'],['past','Past & canceled'],['all','All trips']].map(([key,label])=><button type="button" key={key} aria-pressed={userTravelFilter===key} className="rounded-lg border bg-white px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>setUserTravelFilter(key)}>{label}</button>)}</div>}{connected&&user.role==='admin'&&ready&&<TripArchive client={supabaseClient} trips={trips} refresh={refreshSaved}/>}{user.role==='admin'&&<div className="grid gap-3 sm:grid-cols-2 max-w-2xl"><label className="block text-xs text-slate-600">Hotel request status<select className={input+' mt-1'} value={hotelFilter} onChange={e=>setHotelFilter(e.target.value)}>{hotelFilters.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-      <label className="block text-xs text-slate-600">Team member<select className={input+' mt-1'} value={hotelName} onChange={e=>setHotelName(e.target.value)}>
+    {tab==='travel'&&<div className="space-y-5">{hotelFocusId&&user.role==='admin'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-4 py-3 text-sm"><span>Request selected from the Admin dashboard</span><div className="flex gap-3"><button type="button" className="text-blue-700" onClick={()=>{setHotelFocusId(null);setTab('admin');}}>Back to dashboard</button><button type="button" className="text-blue-700" onClick={()=>{setHotelFocusId(null);setHotelFilter('active');}}>Show all requests</button></div></div>}{user.role!=='admin'&&<div className="flex flex-wrap gap-2" aria-label="Trip history">{[['upcoming','Upcoming'],['past','Past & canceled'],['all','All trips']].map(([key,label])=><button type="button" key={key} aria-pressed={userTravelFilter===key} className="rounded-lg border bg-white px-3 py-2 text-sm aria-pressed:bg-blue-50" onClick={()=>setUserTravelFilter(key)}>{label}</button>)}</div>}{connected&&user.role==='admin'&&ready&&<TripArchive client={supabaseClient} trips={trips} refresh={refreshSaved}/>}{user.role==='admin'&&<div className="grid gap-3 sm:grid-cols-2 max-w-2xl"><label className="block text-xs text-slate-600">Hotel request status<select className={input+' mt-1'} value={hotelFilter} onChange={e=>{setHotelFocusId(null);setHotelFilter(e.target.value);}}>{hotelFilters.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="block text-xs text-slate-600">Team member<select className={input+' mt-1'} value={hotelName} onChange={e=>{setHotelFocusId(null);setHotelName(e.target.value);}}>
         <option value="">All team members</option>
         {hotelNames.map(name=><option key={name} value={name}>{name}</option>)}
       </select></label></div>}{!visibleTrips.length&&ready&&<div className="bg-white border rounded-xl p-8 text-center text-slate-600"><p>No hotel requests match this view.</p><button type="button" disabled={busy} className="mt-3 text-blue-700 underline" onClick={()=>open(null)}>Plan a trip</button></div>}{visibleTrips.map(t=>t.archivedAt?<article key={t.id} className="rounded-xl border bg-white p-5"><h2 className="font-semibold">{t.person}</h2><p className="mt-1 text-sm">Check-in {display(t.checkin)} · Check-out {display(t.checkout)}</p></article>:t.canceledAt?<CanceledHotelCard key={t.id} trip={t} isAdmin={user.role==='admin'} busy={busy} onNotify={recordHotelNotification}/>:<article key={t.id} className="bg-white border rounded-2xl p-6"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-semibold text-lg">{t.person}</h2>{(visibleProject(t.project)||visibleHotel(t.hotel))&&<p className="text-xs text-slate-500">{[visibleProject(t.project),visibleHotel(t.hotel)].filter(Boolean).join(' · ')}</p>}</div><div className="flex flex-col items-end gap-2"><Status value={hotelStatus(t)}/>{user.role==='admin'&&<label className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-slate-700 bg-slate-50"><input type="checkbox" checked={t.hotelRequested===true} disabled={busy||user.role!=='admin'} onChange={e=>markRequested(t,e.target.checked)} aria-label={'Requested: '+t.person}/>Requested</label>}</div></div><div className="grid md:grid-cols-3 gap-5 my-5 text-sm"><div><p className="text-xs text-slate-500 mb-1">Hotel stay</p><p>{display(t.checkin)} → {display(t.checkout)}</p><p className="text-xs mt-2">Hotel loyalty number: {t.membership||'Not provided'}</p></div><div><p className="text-xs text-slate-500 mb-1">Arrival flight · {t.outFlight}</p><p>{t.outOrigin} → {t.outDestination}</p><p>{display(t.outDate)} {t.outTime}</p></div><div><p className="text-xs text-slate-500 mb-1">Return flight · {t.returnFlight}</p><p>{t.returnOrigin} → {t.returnDestination}</p><p>{display(t.returnDate)} {t.returnTime}</p></div></div>{t.notes&&<p className="text-sm my-3 whitespace-pre-wrap break-words">Comments: {t.notes}</p>}<div className="border-t mt-4 pt-4"><label className="block text-xs text-slate-500">Confirmation Number<input className={input+' mt-1'} maxLength={100} readOnly={!canManageRequest(user,t)} placeholder="Pending hotel confirmation" value={canManageRequest(user,t)?(drafts[t.id]??t.confirmationNumber??''):(t.confirmationNumber||'')} onChange={e=>setDrafts(p=>({...p,[t.id]:e.target.value}))}/></label><div className="flex flex-wrap gap-3 mt-3">{canManageRequest(user,t)&&<button disabled={busy} className={button} onClick={()=>confirm(t)}>Save confirmation</button>}{(t.userId===user.id||user.role==='admin')&&<button disabled={busy} className="border rounded-lg px-4 py-2 text-blue-700 text-sm" onClick={()=>open(t)}>Edit request</button>}{canManageRequest(user,t)&&<button disabled={busy} className="border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm hover:bg-red-50" onClick={()=>{setRemoving(t);setAcknowledgeHotel(false);setError('');}}>Cancel request</button>}</div>{t.needsReview&&<p className="text-sm text-amber-800 mt-3">Changed after confirmation. Review and hotel reconfirmation required.</p>}<p className="text-xs text-slate-500 mt-3">Hotel confirmation is recorded manually by the reservation owner or an admin.</p></div></article>)}</div>}
 
-    {tab==='transport'&&<Transfers trips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} user={user} busy={busy} onSave={saveTransfer} onAllocate={saveDrivers} passengersShared={transferPassengersReady}/>}
+    {tab==='transport'&&<Transfers key={transferFocusKey||'all'} focusKey={transferFocusKey} onClearFocus={()=>setTransferFocusKey(null)} onBackToAdmin={()=>{setTransferFocusKey(null);setTab('admin');}} trips={transferTrips} allocations={transferAllocations} drivers={references?.drivers} user={user} busy={busy} onSave={saveTransfer} onAllocate={saveDrivers} passengersShared={transferPassengersReady}/>}
 
     {tab==='planner'&&<Schedule countryTrips={countryTrips} countryLimited={countryLimited} month={month} setMonth={setMonth} people={people} trips={trips} tags={tags} sectorLabel={connected?'Department':'Sector'} allowTeamEdit={connected} presence={presence} schedule={schedule} user={user} ready={ready} busy={busy} onEdit={editSchedule} onChange={(changes,targetUserId)=>saveSchedule(()=>changes,{targetUserId})} onUndo={scheduleEdit||scheduleWarning||!scheduleHistory.current.length?undefined:undoSchedule}/>}
-    {tab==='access'&&user.role==='admin'&&(database?<Database database={database} shared={shared||connected} trips={trips} onReferences={setReferences}>{usersAccess}</Database>:usersAccess)}
-    {tab==='audit'&&user.role==='admin'&&<TravelAudit repo={repo} user={user} trips={trips} shared={shared||connected} connected={connected}/>}
+    {tab==='admin'&&user.role==='admin'&&<div className="space-y-5">
+      <nav aria-label="Admin sections" className="flex flex-wrap items-center gap-1 rounded-xl border bg-white p-1.5">
+        {[[ 'dashboard','Dashboard'],['database',database?'Database':'Users & access'],['logs','Logs']].map(([key,label])=><button key={key} type="button" aria-current={adminSection===key?'page':undefined} className={'rounded-lg px-4 py-2.5 text-sm font-medium '+(adminSection===key?'bg-blue-50 text-blue-900':'text-slate-600 hover:bg-slate-50')} onClick={()=>setAdminSection(key)}>{label}</button>)}
+      </nav>
+      {adminSection==='dashboard'&&<AdminDashboard user={user} repo={repo} trips={trips} people={people} schedule={schedule} presence={presence} transferTrips={transferTrips} allocations={transferAllocations} drivers={connected?references?.drivers:(references?.drivers||DRIVERS)} ready={ready} busy={busy} scheduleReady={sharedScheduleReady} onRefresh={refreshAdmin} onHotel={openAdminHotel} onTransfer={openAdminTransfer} onLogs={()=>setAdminSection('logs')} onSchedule={()=>{setMonth(new Date());navigate('planner');}}/>}
+      {adminSection==='database'&&(database?<Database database={database} shared={shared||connected} trips={trips} onReferences={setReferences}>{usersAccess}</Database>:usersAccess)}
+      {adminSection==='logs'&&<TravelAudit repo={repo} user={user} trips={trips} shared={shared||connected} connected={connected}/>}
+    </div>}
   </main>
 
   {removing&&<Dialog title="Cancel hotel request" onClose={()=>{if(!busy){setRemoving(null);setError('');}}}><div className="p-6 space-y-4">

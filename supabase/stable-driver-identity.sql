@@ -1,6 +1,7 @@
 -- Run once in the Supabase SQL Editor as the project owner.
 -- Preserve the existing jos/vla/ota identifiers and all transfer allocations.
--- Existing RLS and table grants are unchanged; driver IDs cannot be changed by edits.
+-- Keep driver references readable by authenticated staff; writes require admin role.
+-- Driver IDs cannot be changed by edits.
 begin;
 lock table public.drivers in access exclusive mode;
 alter table public.drivers add column if not exists driver_id text;
@@ -11,6 +12,27 @@ where driver_id is null;
 alter table public.drivers alter column driver_id set not null;
 create unique index if not exists drivers_stable_id_unique on public.drivers(driver_id);
 create unique index if not exists drivers_display_name_unique on public.drivers(lower(btrim(name)));
+alter table public.drivers enable row level security;
+drop policy if exists staff_drivers_authenticated_read on public.drivers;
+create policy staff_drivers_authenticated_read on public.drivers for select to authenticated using (true);
+drop policy if exists staff_drivers_admin_update on public.drivers;
+create policy staff_drivers_admin_update on public.drivers for update to authenticated
+using ((select public.is_staff_admin())) with check ((select public.is_staff_admin()));
+drop policy if exists staff_drivers_admin_insert on public.drivers;
+create policy staff_drivers_admin_insert on public.drivers for insert to authenticated
+with check ((select public.is_staff_admin()));
+-- Restrictive policies also protect against any older permissive write policies.
+drop policy if exists staff_drivers_admin_update_guard on public.drivers;
+create policy staff_drivers_admin_update_guard on public.drivers as restrictive for update to authenticated
+using ((select public.is_staff_admin())) with check ((select public.is_staff_admin()));
+drop policy if exists staff_drivers_admin_insert_guard on public.drivers;
+create policy staff_drivers_admin_insert_guard on public.drivers as restrictive for insert to authenticated
+with check ((select public.is_staff_admin()));
+drop policy if exists staff_drivers_admin_delete_guard on public.drivers;
+create policy staff_drivers_admin_delete_guard on public.drivers as restrictive for delete to authenticated
+using ((select public.is_staff_admin()));
+revoke insert, update, delete on public.drivers from public, anon;
+grant select, insert, update on public.drivers to authenticated;
 
 create or replace function public.staff_preserve_driver_identity()
 returns trigger language plpgsql set search_path='' as $$
