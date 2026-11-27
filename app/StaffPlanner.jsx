@@ -483,7 +483,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
         <section className="space-y-3 rounded-xl border p-4" aria-labelledby="trip-transfers-heading">
           <h3 id="trip-transfers-heading" tabIndex={-1} className="font-semibold text-slate-900 outline-none">Airport transfers</h3>
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-            <p className="text-sm font-semibold text-blue-900">Airport → Hotel</p>
+            <p className="text-sm font-semibold text-blue-900">Airport Pick-Up</p>
             <p className="mt-1 text-sm text-slate-700">{parse(trip.outDate)&&trip.outTime&&trip.outTime.length===5?[trip.outDate,trip.outFlight,trip.outTime].filter(Boolean).join(' · '):'Add your arrival flight above.'}</p>
             <p className="mt-1 text-xs text-slate-600">Included automatically; the driver follows your arrival flight.</p>
           </div>
