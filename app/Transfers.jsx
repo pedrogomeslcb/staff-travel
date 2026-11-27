@@ -86,12 +86,14 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
   </article>;
 }
 
-export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate,passengersShared=true}) {
+export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,onSave,onAllocate,passengersShared=true,focusKey=null,onClearFocus,onBackToAdmin}) {
   const [editing,setEditing]=useState(null),[allocation,setAllocation]=useState(null),[error,setError]=useState('');
-  const [direction,setDirection]=useState('all'),[period,setPeriod]=useState('upcoming'),[includeCanceled,setIncludeCanceled]=useState(false);
+  const [direction,setDirection]=useState('all'),[period,setPeriod]=useState(focusKey?'all':'upcoming'),[includeCanceled,setIncludeCanceled]=useState(false);
   const [expandedDays,setExpandedDays]=useState({}),[expandedSlots,setExpandedSlots]=useState({});
   const [expansionMode,setExpansionMode]=useState('auto'),dayIdPrefix=useId();
-  const today=iso(new Date()),plan=buildTransferPlan(trips,{direction,period,today,includeCanceled,allocations,drivers});
+  const today=iso(new Date()),fullPlan=buildTransferPlan(trips,{direction,period,today,includeCanceled,allocations,drivers});
+  const focusedGroup=focusKey?fullPlan.days.flatMap(day=>day.groups).find(group=>group.key===focusKey):null;
+  const plan=focusKey?(focusedGroup?{days:[{date:focusedGroup.date,groups:[focusedGroup],people:focusedGroup.people,arrivals:focusedGroup.leg==='arrival'?focusedGroup.people:0,pickups:focusedGroup.leg==='return'?focusedGroup.people:0}],people:focusedGroup.people,attention:focusedGroup.attention}:{days:[],people:0,attention:0}):fullPlan;
   const nearestDay=plan.days.reduce((best,day)=>{
     if(!day.date)return best;
     const distance=Math.abs(Date.parse(day.date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'));
@@ -134,6 +136,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     catch(e) {setError(e.message);}
   }
   return <div className="space-y-4">
+    {focusKey&&user.role==='admin'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-4 py-3 text-sm"><span>Transfer selected from the Admin dashboard</span><div className="flex gap-3"><button type="button" className="text-blue-700" onClick={onBackToAdmin}>Back to dashboard</button><button type="button" className="text-blue-700" onClick={onClearFocus}>Show all transfers</button></div></div>}
     <section className="space-y-3 rounded-xl border bg-white p-4" aria-label="Transfer plan overview">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="text-base font-semibold text-slate-900">Transfer plan</h2>
@@ -144,9 +147,9 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-md bg-slate-100 p-0.5" aria-label="Date range">
-          {[['upcoming','Upcoming'],['all','All dates']].map(([value,label])=><button key={value} aria-pressed={period===value} className={'rounded px-2.5 py-1.5 text-xs font-medium '+(period===value?'bg-white text-blue-800 shadow-sm':'text-slate-600')} onClick={()=>setPeriod(value)}>{label}</button>)}
+          {[['upcoming','Upcoming'],['all','All dates']].map(([value,label])=><button key={value} aria-pressed={period===value} className={'rounded px-2.5 py-1.5 text-xs font-medium '+(period===value?'bg-white text-blue-800 shadow-sm':'text-slate-600')} onClick={()=>{if(focusKey)onClearFocus();else setPeriod(value);}}>{label}</button>)}
         </div>
-        <select aria-label="Transfer direction" className="rounded-md border bg-white px-2 py-1.5 text-xs text-slate-700" value={direction} onChange={event=>setDirection(event.target.value)}>
+        <select aria-label="Transfer direction" className="rounded-md border bg-white px-2 py-1.5 text-xs text-slate-700" value={direction} onChange={event=>{if(focusKey)onClearFocus();else setDirection(event.target.value);}}>
           <option value="all">All transfers</option><option value="arrival">Arrivals</option><option value="return">Hotel pickups</option>
         </select>
         <label className="flex items-center gap-1.5 px-1 text-xs text-slate-600"><input type="checkbox" checked={includeCanceled} onChange={e=>setIncludeCanceled(e.target.checked)}/>Include canceled</label>
@@ -159,7 +162,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     </section>
     {!passengersShared&&user.role!=='admin'&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Shared passenger details are not enabled yet. An admin must run supabase/transfer-copassengers.sql in Supabase SQL Editor.</p>}
     {error&&!editing&&!allocation&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    {!plan.days.length&&<div className="bg-white border rounded-xl p-10 text-center"><p className="font-medium text-slate-700">{trips.length?'No transfers match these filters.':'No transfers yet.'}</p><p className="text-sm text-slate-500 mt-2">{trips.length?'Try All dates or another transfer direction.':'Create a hotel request to add arrival and return transfers.'}</p>{trips.length>0&&<button className="text-sm text-blue-700 mt-4" onClick={()=>{setPeriod('all');setDirection('all');setIncludeCanceled(true);}}>Show all transfers</button>}</div>}
+    {!plan.days.length&&<div className="bg-white border rounded-xl p-10 text-center"><p className="font-medium text-slate-700">{trips.length?'No transfers match these filters.':'No transfers yet.'}</p><p className="text-sm text-slate-500 mt-2">{trips.length?'Try All dates or another transfer direction.':'Create a hotel request to add arrival and return transfers.'}</p>{trips.length>0&&<button className="text-sm text-blue-700 mt-4" onClick={()=>{if(focusKey)onClearFocus();else{setPeriod('all');setDirection('all');setIncludeCanceled(true);}}}>Show all transfers</button>}</div>}
     <div className="space-y-3" aria-label="Transfers by day">
       {plan.days.map((day,index)=>{
         const expanded=isExpandedDay(day.date),slotsId=dayIdPrefix+'-'+(day.date||'undated');
