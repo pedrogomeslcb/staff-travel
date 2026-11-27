@@ -263,7 +263,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     await save(event);
   }
   async function confirm(t) {await mutate(async()=>{const record=await repo.confirm(user,t,drafts[t.id]??t.confirmationNumber??'');acceptRecord(record);setDrafts(p=>{const n={...p};delete n[t.id];return n;});setMessage(shared?'Hotel confirmation saved.':'Hotel confirmation saved locally.');await refreshSaved();});}
-  async function markRequested(t,value) {await mutate(async()=>{const record=await repo.requested(user,t,value);acceptRecord(record);setMessage(value?'Marked as requested from the hotel.':'');await refreshSaved();});}
+  async function markRequested(t,value) {await mutate(async()=>{const record=await repo.requested(user,t,value);acceptRecord(record);setMessage(value?'Booking requested.':'');await refreshSaved();});}
   async function cancelRequest() {await mutate(async()=>{
     const record=removing;
     const result=await repo.remove(user,record,acknowledgeHotel);

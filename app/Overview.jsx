@@ -8,7 +8,7 @@ export function hotelStatus(t){
   if(t.archivedAt)return ['Archived','bg-slate-100 text-slate-700'];
   if(t.needsReview)return ['Reconfirmation required','bg-amber-50 text-amber-900'];
   if(t.confirmationNumber)return ['Confirmed','bg-emerald-50 text-emerald-800'];
-  if(t.hotelRequested)return ['Requested from hotel','bg-blue-50 text-blue-800'];
+  if(t.hotelRequested)return ['Booking requested','bg-blue-50 text-blue-800'];
   return ['Submitted · awaiting hotel request','bg-amber-50 text-amber-900'];
 }
 export function Status({value}){return <span className={'inline-block rounded-md px-2 py-1 text-xs font-medium '+value[1]}>{value[0]}</span>;}
