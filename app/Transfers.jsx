@@ -46,14 +46,14 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
           {group.drivers.map(driver=><li key={driver.id} className="group relative rounded-lg border bg-stone-50 px-2.5 py-1.5 text-slate-600"
             title={`${driver.name} · ${driver.licensePlate} · ${driver.contact}`}>
             <p><strong className="text-slate-900">{driver.name}</strong> · {driver.licensePlate}</p>
-            <p>{driver.contact} · {group.people?`${driver.passengers.length}/${driver.capacity} seats`:seatLabel(driver.capacity)}</p>
+            <p>{driver.contact&&(/^[+\d\s().-]+$/.test(driver.contact)?<a className="text-blue-700 underline" href={'tel:'+driver.contact.replace(/[^+\d]/g,'')}>{driver.contact}</a>:driver.contact)} · {group.people?`${driver.passengers.length}/${driver.capacity} seats`:seatLabel(driver.capacity)}</p>
             {expanded&&group.drivers.length>1&&driver.passengers.length>0&&<p className="mt-1 max-w-48 break-words text-slate-700">{driver.passengers.join(', ')}</p>}
             {canAssign&&<button type="button" disabled={busy}
               aria-label={'Remove '+driver.name+' from this transfer'} title={'Remove '+driver.name}
               className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border bg-white text-slate-500 opacity-0 hover:text-red-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 disabled:opacity-40"
               onClick={()=>onRemove(group,driver.id)}><X aria-hidden="true" className="size-3"/></button>}
           </li>)}
-        </ul>:group.people>0&&<span className="text-slate-500">Unassigned</span>}
+        </ul>:group.people>0&&<span className="text-amber-800">Awaiting driver</span>}
       </div>
       {canAssign&&<button type="button" disabled={busy}
         className="shrink-0 rounded-md px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
@@ -73,7 +73,7 @@ function TransferSlot({group,expanded,onToggle,isAdmin,busy,onEdit,onAllocate,on
                 <p className="text-xs text-slate-500"><span className="font-medium text-slate-700">{entry.flight||'Flight to confirm'}</span>{arrival&&visibleHotel(entry.hotel)&&' · '+visibleHotel(entry.hotel)}</p>
               </div>
               <div>
-                <span className={'inline-block rounded-full px-2 py-1 text-xs '+(transfer.needsReview?'bg-amber-50 text-amber-800':status[2])}>{transfer.needsReview?'Review required':status[1]}</span>
+                <span className={'inline-block rounded-full px-2 py-1 text-xs '+(transfer.needsReview?'bg-amber-50 text-amber-800':status[2])}>{transfer.needsReview?'Review required':statusKey==='to_arrange'?'Awaiting driver':statusKey==='assigned'?'Driver assigned':status[1]}</span>
                 {transfer.needsReview&&<span className="block text-[11px] text-slate-500">Previously: {TRANSFER_STATUSES.find(value=>value[0]===transfer.status)?.[1]||status[1]}</span>}
               </div>
               {isAdmin&&<button type="button" disabled={busy} className="rounded-md px-2 py-1.5 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50"
@@ -98,7 +98,7 @@ export default function Transfers({trips,allocations,drivers=DRIVERS,user,busy,o
     const bestDistance=best?Math.abs(Date.parse(best.date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z')):Infinity;
     return distance<bestDistance?day:best;
   },null);
-  const nearestSlotKey=nearestDay?.groups[0]?.key;
+  const nearestSlotKey=nearestDay?.groups.find(group=>group.entries.some(entry=>entry.trip.userId===user.id))?.key??nearestDay?.groups[0]?.key;
   const isExpandedDay=date=>expandedDays[date]??(expansionMode==='all'||(expansionMode==='auto'&&date===nearestDay?.date));
   const isExpandedSlot=key=>expandedSlots[key]??(expansionMode==='all'||(expansionMode==='auto'&&key===nearestSlotKey));
   function setAllExpanded(value){

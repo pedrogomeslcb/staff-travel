@@ -37,6 +37,8 @@ export default function SupabaseGate() {
   const [confirmPassword,setConfirmPassword]=useState('');
   const [notice,setNotice]=useState('');
   const [password,setPassword]=useState('');
+  const [showPassword,setShowPassword]=useState(false);
+  const [remember,setRemember]=useState(true);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const loadIdentity=useCallback(async()=>{
@@ -74,6 +76,7 @@ export default function SupabaseGate() {
     setBusy(true);setError('');
     try {
       const email=signInIdentifier(loginName);
+      sessionStorage.setItem('staff-session-only',remember?'0':'1');
       const {error:loginError}=await supabase.auth.signInWithPassword({email,password});
       if(loginError)setError(loginError.message);
       else await loadIdentity();
@@ -90,6 +93,7 @@ export default function SupabaseGate() {
     if(!teamCode.trim()){setError('Enter the team access code.');return;}
     setBusy(true);
     try {
+      sessionStorage.setItem('staff-session-only','0');
       const {data,error:signupError}=await supabase.auth.signUp({
         email:signInIdentifier(username),
         password,
@@ -99,7 +103,7 @@ export default function SupabaseGate() {
       setLoginName(generatedUsername);
       setPassword('');setConfirmPassword('');setTeamCode('');
       if(!data.session){
-        setNotice('Account request received but email confirmation is enabled. This username-only setup requires turning off Confirm email in Supabase.');
+        setNotice('Your account was created, but sign-in is not available yet. Contact a Staff Planner administrator.');
         setView('login');
       }else {
         await loadIdentity();
@@ -124,7 +128,7 @@ export default function SupabaseGate() {
     initialUser={identity} loginName={identity.name} supabaseClient={supabase} onSupabaseSignOut={signOut}/>;
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5">
     <div className="w-full max-w-md space-y-4 rounded-2xl border bg-white p-7 shadow-sm">
-      <h1 className="text-2xl font-semibold text-blue-900">Staff & Travel</h1>
+      <h1 className="text-2xl font-semibold text-blue-900">Staff Planner</h1>
       <div className="grid grid-cols-2 rounded-lg border bg-slate-50 p-1 text-sm">
         <button type="button" className={view==='login'?'rounded-md bg-white p-2 font-semibold shadow-sm':'p-2 text-slate-600'}
           onClick={()=>{setView('login');setError('');setNotice('');setPassword('');}}>Sign in</button>
@@ -145,12 +149,12 @@ export default function SupabaseGate() {
           <input type="text" required autoComplete="username"
             placeholder="e.g. P/GOM" className={input+' mt-1'} value={loginName}
             onChange={e=>setLoginName(e.target.value.includes('@')?e.target.value:e.target.value.toUpperCase())}/></label>}
-        <label className="block text-sm">Password<input type="password" required
+        <label className="block text-sm">Password<input type={showPassword?'text':'password'} required
           autoComplete={view==='register'?'new-password':'current-password'}
           minLength={view==='register'?6:undefined}
           className={input+' mt-1'} value={password} onChange={e=>setPassword(e.target.value)}/></label>
         {view==='register'&&<>
-          <label className="block text-sm">Confirm password<input type="password" required minLength={6}
+          <label className="block text-sm">Confirm password<input type={showPassword?'text':'password'} required minLength={6}
             autoComplete="new-password" className={input+' mt-1'} value={confirmPassword}
             onChange={e=>setConfirmPassword(e.target.value)}/></label>
           <label className="block text-sm">Team access code<input type="password" required
@@ -158,13 +162,14 @@ export default function SupabaseGate() {
             onChange={e=>setTeamCode(e.target.value)}/></label>
           <p className="text-xs text-amber-800">You can register without an admin. Your IHG membership is linked separately after identity verification; the registration code does not grant access to anyone else's membership.</p>
         </>}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showPassword} onChange={e=>setShowPassword(e.target.checked)}/>Show password</label>
+        {view==='register'&&confirmPassword&&password!==confirmPassword&&<p role="status" className="text-sm text-red-700">Passwords do not match.</p>}
+        {view==='login'&&<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>Keep me signed in on this device</label>}
         <button className={button+' w-full'} disabled={busy}>{busy?'Processing…':view==='register'?'Create account':'Sign in'}</button>
       </form>
       {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {notice&&<p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
-      {view==='login'&&<button className="text-xs text-slate-600 underline" disabled={busy} onClick={signOut}>Clear current session</button>}
-      <p className="text-xs text-amber-900">Only the reference Database is shared. Hotel requests and schedules are still local
-        to this browser until a secure shared workspace is configured.</p>
+      {view==='login'&&<details className="text-sm text-slate-600"><summary className="cursor-pointer font-medium text-blue-700">Forgot your password?</summary><p className="mt-2">Contact a Staff Planner administrator with your username to request a password reset. Never send your password.</p></details>}
     </div>
   </main>;
 }
