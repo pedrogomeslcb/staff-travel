@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState, useEffect, useMemo, useRef, useId} from 'react';
-import {blank, pad, iso, parse, display, maskDate, nightsBetween, toDraft, changeTrip, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
+import {blank, pad, iso, parse, display, maskDate, nightsBetween, toDraft, changeTrip, prepareRequest, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
 import {HotelReminderError} from '../lib/travel-audit.mjs';
 import {scheduleWeekdays} from '../lib/schedule-edit.mjs';
 import {localRepository, remoteRepository, KEYS} from '../lib/repository.mjs';
@@ -11,7 +11,7 @@ import {supabaseWorkspace} from '../lib/supabase-workspace.mjs';
 import SupabaseUsersAccess from './SupabaseUsersAccess';
 import Schedule from './Schedule';
 import Overview,{hotelStatus,Status} from './Overview';
-import {countryYearBreakdown,annualLimit} from '../lib/country-days.mjs';
+import TripReview from './TripReview';
 import Dialog from './Dialog';
 import TripArchive from './TripArchive';
 import Transfers from './Transfers';
@@ -98,6 +98,8 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   const [month,setMonth]=useState(()=>new Date()),[scheduleEdit,setScheduleEdit]=useState(null);
   const [hotelName,setHotelName]=useState('');
   const [tripStep,setTripStep]=useState(0);
+  const tripFocus=useRef(null);
+  useEffect(()=>{if(modal&&tripFocus.current){const heading=document.getElementById(tripFocus.current);tripFocus.current=null;heading?.focus();heading?.scrollIntoView({block:'start'});}},[modal,tripStep]);
   const [showHelp,setShowHelp]=useState(()=>{try{return !localStorage.getItem('staff-help-seen-'+initialUser?.id);}catch{return true;}});
   const [profileMembership,setProfileMembership]=useState(null);
   const [userTravelFilter,setUserTravelFilter]=useState('upcoming');
@@ -215,7 +217,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
   function open(record) {
     const ownerId=record?.userId??user.id;
     requestUserIdRef.current=ownerId;setRequestUserId(ownerId);
-    setEditing(record?.id??null);setTripStep(0);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);
+    setEditing(record?.id??null);tripFocus.current=null;setTripStep(0);setJoinedPickupTime('');setPickupOptions([]);setPickupOptionsError('');setPickupLookupDone(false);
     setTrip({...toDraft(record),...(!record?{project:'Unspecified',hotel:'Not specified'}:{}),...(!record&&connected?{membership:references?.membership||''}:{})});
     setError('');setModal(true);
     if(connected&&!record)database.references().then(data=>{
@@ -235,19 +237,24 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       setMessage(!result.changed?'No changes to save.':editing!==null?'Trip updated.':'Trip submitted. Hotel and transfer arrangements are not yet confirmed.');await refreshSaved();
     });
   }
-  function nextTripStep(form){
-    const fields=[...form.querySelectorAll('[data-trip-step="'+tripStep+'"] input,[data-trip-step="'+tripStep+'"] select')];
-    const invalid=fields.find(field=>!field.checkValidity());
-    if(invalid){invalid.reportValidity();return;}
-    if(tripStep===0){const start=parse(trip.outDate),end=parse(trip.returnDate);if(!start||!end){setError('Enter valid flight dates in DD/MM/YYYY format.');return;}if(end+'T'+trip.returnTime<=start+'T'+trip.outTime){setError('Departure must be after arrival.');return;}}
-    if(tripStep===1){const start=parse(trip.checkin),end=parse(trip.checkout);if(!start||!end||end<=start){setError('Check-out must be after check-in.');return;}}
-    setError('');setTripStep(step=>Math.min(2,step+1));
+  function editTripSection(heading='trip-details-heading'){
+    tripFocus.current=heading;setError('');setTripStep(0);
+  }
+  function validateTrip(){
+    const old=editing===null?null:trips.find(t=>t.id===editing);
+    if(editing!==null&&!old)throw new Error('This request is no longer available. Close it and reopen the latest version.');
+    const target=requestUserId===user.id?user:requestUsers.find(p=>p.id===requestUserId);
+    // Run the same pure validation as the repository without saving a request.
+    prepareRequest(user,trip,old,'review-preview',new Date().toISOString(),target??null);
   }
   async function submitTrip(event){
-    event.preventDefault();const form=event.currentTarget;
-    if(tripStep<2){nextTripStep(form);return;}
-    const invalid=[...form.querySelectorAll('input,select')].find(field=>!field.checkValidity());
-    if(invalid){const step=Number(invalid.closest('[data-trip-step]')?.dataset.tripStep??2);setTripStep(step);setError('Complete all required fields before submitting.');return;}
+    event.preventDefault();
+    if(busy)return;
+    if(tripStep===0&&!event.currentTarget.reportValidity())return;
+    try{validateTrip();}catch(error){setError(error.message);return;}
+    if(tripStep===0){
+      setError('');tripFocus.current='trip-review-heading';setTripStep(1);return;
+    }
     await save(event);
   }
   async function confirm(t) {await mutate(async()=>{const record=await repo.confirm(user,t,drafts[t.id]??t.confirmationNumber??'');acceptRecord(record);setDrafts(p=>{const n={...p};delete n[t.id];return n;});setMessage(shared?'Hotel confirmation saved.':'Hotel confirmation saved locally.');await refreshSaved();});}
@@ -438,13 +445,53 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
     </form>
   </Dialog>}
 
-  {modal&&<Dialog wide title={editing!==null?'Edit trip':'Plan a trip'} onClose={()=>!busy&&setModal(false)}><form noValidate onSubmit={submitTrip} className="p-4 sm:p-6 space-y-5"><nav aria-label="Trip steps" className="grid grid-cols-3 gap-2">{['Flights','Hotel','Transfers'].map((label,i)=><button type="button" key={label} aria-current={tripStep===i?'step':undefined} disabled={busy||i>tripStep} onClick={()=>setTripStep(i)} className={'rounded-lg border px-2 py-2 text-sm '+(i===tripStep?'bg-blue-700 text-white':'bg-slate-50 text-slate-700')}>{i+1}. {label}</button>)}</nav><p className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: 00:00–23:59, local to the airport or pickup location.</p><div data-trip-step="0" hidden={tripStep!==0} className="space-y-5"><section aria-label="Arrival flight"><h3 className="font-semibold mb-3">Arrival flight</h3><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','outFlight',arrivalOptions)}{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}{date('Arrival date','outDate')}{time('Arrival time','outTime')}</div></section><section aria-label="Return flight"><h3 className="font-semibold mb-3">Return flight</h3><div className="grid sm:grid-cols-2 gap-4">{flightInput('Flight number','returnFlight',departureOptions)}{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}{date('Departure date','returnDate')}{time('Departure time','returnTime')}</div></section></div><div data-trip-step="1" hidden={tripStep!==1}><section className="space-y-4" aria-label="Hotel details"><h3 className="font-semibold">Hotel details</h3>{user.role==='admin'&&editing===null
+  {modal&&<Dialog wide title={editing!==null?'Edit trip':'Plan a trip'} onClose={()=>!busy&&setModal(false)}>
+    <form noValidate onSubmit={submitTrip} className="p-4 sm:p-6 space-y-5">
+      <nav aria-label="Trip steps" className="grid grid-cols-2 gap-2 text-sm">
+        <button type="button" aria-current={tripStep===0?'step':undefined} disabled={busy} onClick={()=>{if(tripStep===1)editTripSection();}} className={'rounded-lg border px-3 py-2 '+(tripStep===0?'bg-blue-700 text-white':'bg-slate-50 text-slate-700')}>1. Trip details</button>
+        <div aria-current={tripStep===1?'step':undefined} className={'rounded-lg border px-3 py-2 text-center '+(tripStep===1?'bg-blue-700 text-white':'bg-slate-50 text-slate-600')}>2. Review</div>
+      </nav>
+      {tripStep===0?<div className="space-y-4">
+        <h3 id="trip-details-heading" tabIndex={-1} className="sr-only">Trip details</h3>
+        <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-800">Dates: DD/MM/YYYY · Times: local to the airport or pickup location. Hotel and pickup dates are prefilled from your flights and can be edited.</p>
+        <section className="space-y-3 rounded-xl border p-4" aria-labelledby="trip-flights-heading">
+          <h3 id="trip-flights-heading" tabIndex={-1} className="font-semibold text-slate-900 outline-none">Flights</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="min-w-0 rounded-lg bg-slate-50 p-3 space-y-3">
+              <h4 className="text-sm font-semibold">Arrival flight</h4>
+              {flightInput('Flight number','outFlight',arrivalOptions)}
+              <div className="grid grid-cols-2 gap-2">{field('Origin airport','outOrigin')}{field('Arrival airport','outDestination')}</div>
+              {date('Arrival date','outDate')}{time('Arrival time','outTime')}
+            </div>
+            <div className="min-w-0 rounded-lg bg-slate-50 p-3 space-y-3">
+              <h4 className="text-sm font-semibold">Departure flight</h4>
+              {flightInput('Flight number','returnFlight',departureOptions)}
+              <div className="grid grid-cols-2 gap-2">{field('Origin airport','returnOrigin')}{field('Destination airport','returnDestination')}</div>
+              {date('Departure date','returnDate')}{time('Departure time','returnTime')}
+            </div>
+          </div>
+        </section>
+        <section className="space-y-3 rounded-xl border p-4" aria-labelledby="trip-hotel-heading">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 id="trip-hotel-heading" tabIndex={-1} className="font-semibold text-slate-900 outline-none">Hotel stay</h3><p className="text-xs font-medium text-blue-700" aria-live="polite">{nights!==null&&nights>0?String(nights)+(nights===1?' night':' nights'):''}</p></div>
+          <div className="grid gap-3 sm:grid-cols-2">{date('Check-in date','checkin')}{date('Check-out date','checkout')}{user.role==='admin'&&editing===null
         ?<label className="block text-xs text-slate-600">Full name<select required className={input+' mt-1'} value={requestUserId} onChange={e=>selectRequestUser(e.target.value)}>
           {requestUsers.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}
         </select></label>
         :fixed('Full name',editing!==null?trip.person||user.name:user.name)}
-      {field('Hotel loyalty number (optional)','membership',false)}<div className="grid sm:grid-cols-2 gap-4">{date('Check-in date','checkin')}{date('Check-out date','checkout')}</div><p className="text-sm text-blue-700" aria-live="polite">{nights!==null&&nights>0?`${nights} ${nights===1?'night':'nights'}`:'Select valid check-in and check-out dates to calculate nights.'}</p></section></div><div data-trip-step="2" hidden={tripStep!==2} className="space-y-4"><section className="bg-slate-50 border rounded-xl p-4" aria-label="Hotel to airport pickup"><h3 className="font-semibold mb-2">Hotel → airport pickup</h3><p className="text-xs text-slate-500 mb-3">Both airport transfers are required. On arrival, the driver follows your flight. For your return, specify when the driver should pick you up at the hotel.</p><div className="grid sm:grid-cols-2 gap-4">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div>
-      {connected&&parse(trip.pickupDate)&&!trip.returnOrigin.trim()&&<p className="mt-3 text-xs text-slate-600">Enter the return-flight departure airport above to find existing transfers for this date.</p>}
+      {field('IHG membership (optional)','membership',false)}</div>
+        </section>
+        <section className="space-y-3 rounded-xl border p-4" aria-labelledby="trip-transfers-heading">
+          <h3 id="trip-transfers-heading" tabIndex={-1} className="font-semibold text-slate-900 outline-none">Airport transfers</h3>
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+            <p className="text-sm font-semibold text-blue-900">Airport → Hotel</p>
+            <p className="mt-1 text-sm text-slate-700">{parse(trip.outDate)&&trip.outTime&&trip.outTime.length===5?[trip.outDate,trip.outFlight,trip.outTime].filter(Boolean).join(' · '):'Add your arrival flight above.'}</p>
+            <p className="mt-1 text-xs text-slate-600">Included automatically; the driver follows your arrival flight.</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3 space-y-3">
+            <h4 className="text-sm font-semibold">Hotel → Airport</h4>
+            <p className="text-xs text-slate-600">Choose when the driver should pick you up at the hotel.</p>
+            <div className="grid sm:grid-cols-2 gap-3">{date('Hotel pickup date','pickupDate')}{time('Hotel pickup time','pickupTime')}</div>
+            {connected&&parse(trip.pickupDate)&&!trip.returnOrigin.trim()&&<p className="mt-3 text-xs text-slate-600">Enter the return-flight departure airport above to find existing transfers for this date.</p>}
       {connected&&pickupOptionsLoading&&<p role="status" className="mt-3 text-xs text-slate-600">Checking existing transfers for this pickup date…</p>}
       {connected&&pickupLookupDone&&!pickupOptionsLoading&&!pickupOptionsError&&!eligiblePickupOptions.length&&<p className="mt-3 text-xs text-slate-600">No compatible transfers found for this date and departure airport. You can enter a new pickup time.</p>}
       {connected&&pickupOptionsError&&<p className="mt-3 text-xs text-amber-800">{pickupOptionsError} You may still enter your pickup time manually.</p>}
@@ -469,6 +516,17 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
           </div>;
         })}
         <p className="text-xs text-slate-600">Selecting also adopts the existing pickup location internally so your request joins the same transfer group. Vehicle seats and driver allocation remain subject to administrator confirmation.</p>
-      </div>}</section><label className="block text-xs text-slate-600">Comments<textarea className={input+' mt-1'} maxLength={2000} rows={3} value={trip.notes} onChange={e=>change('notes',e.target.value)}/></label>{editing!==null&&trip.confirmationNumber&&<p className="text-sm text-amber-800">Changes to a confirmed request require hotel reconfirmation. The confirmation number will be preserved.</p>}<p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Review: {trip.outFlight} · {trip.outDate} → {trip.returnFlight} · {trip.returnDate}. Hotel: {trip.checkin} – {trip.checkout}. Both airport transfers are included.</p>{(()=>{const arrival=parse(trip.outDate),departure=parse(trip.returnDate);if(!arrival||!departure||departure<arrival)return null;const target=requestUserId||user.id;const current=trips.filter(t=>t.userId===target&&t.id!==editing);const withTrip=[...current,{userId:target,outDate:arrival,returnDate:departure}];const years=[...new Set([Number(arrival.slice(0,4)),Number(departure.slice(0,4))])];return years.map(year=>{const quota=countryYearBreakdown(withTrip,target,year,iso(new Date()));return <p key={year} className={'rounded-lg p-3 text-sm '+(quota.total>=75?'bg-amber-50 text-amber-900':'bg-slate-50 text-slate-700')}>{year}: {quota.total} / {annualLimit} days used or planned.{quota.total>annualLimit?' This trip exceeds the annual allowance by '+(quota.total-annualLimit)+' days.':quota.total>=85?' Near the annual allowance.':''}</p>;});})()}</div>{error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}<div className="flex flex-wrap justify-between gap-2">{tripStep>0&&<button type="button" disabled={busy} className="rounded-lg border px-4 py-2 text-sm" onClick={()=>{setError('');setTripStep(i=>i-1);}}>Back</button>}<button disabled={busy} className={button+' ml-auto'}>{busy?'Saving…':tripStep===0?'Continue to hotel':tripStep===1?'Continue to transfers':editing!==null?'Save changes':'Submit trip'}</button></div></form></Dialog>}
+      </div>}
+          </div>
+        </section>
+        <section className="rounded-xl border p-4 space-y-2" aria-labelledby="trip-comments-heading"><h3 id="trip-comments-heading" tabIndex={-1} className="sr-only">Comments</h3><label className="block text-xs text-slate-600">Comments (optional)<textarea className={input+' mt-1'} maxLength={2000} rows={3} value={trip.notes} onChange={e=>change('notes',e.target.value)}/></label></section>
+      </div>:<TripReview trip={trip} trips={trips} userId={requestUserId||user.id} personName={editing!==null?(trip.person||user.name):(requestUsers.find(p=>p.id===requestUserId)?.name||user.name)} editing={editing} busy={busy} onEdit={editTripSection} joinedPickup={Boolean(joinedPickupTime&&joinedPickupTime===trip.pickupTime&&eligiblePickupOptions.some(option=>option.time===trip.pickupTime&&option.pickupLocation===trip.hotel))}/>}
+      {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
+        <button type="button" disabled={busy} className="rounded-lg border px-4 py-2 text-sm" onClick={()=>tripStep===1?editTripSection():setModal(false)}>{tripStep===1?'Back':'Cancel'}</button>
+        <button type="submit" disabled={busy} className={button}>{busy?'Saving…':tripStep===0?'Review trip':editing!==null?'Save changes':'Submit trip'}</button>
+      </div>
+    </form>
+  </Dialog>}
   </div>;
 }
