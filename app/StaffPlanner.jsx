@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState, useEffect, useMemo, useRef, useId} from 'react';
-import {blank, pad, iso, parse, calendarAnchor, display, maskDate, nightsBetween, toDraft, changeTrip, prepareRequest, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
+import {blank, pad, iso, parse, calendarAnchor, tripCalendarReference, display, maskDate, nightsBetween, toDraft, changeTrip, prepareRequest, updateScheduleEntries, SCHEDULE_CATEGORIES, canManageRequest, hotelNeedsCancellation} from '../lib/planner.mjs';
 import {HotelReminderError} from '../lib/travel-audit.mjs';
 import {scheduleWeekdays} from '../lib/schedule-edit.mjs';
 import {localRepository, remoteRepository, KEYS} from '../lib/repository.mjs';
@@ -371,7 +371,7 @@ export default function StaffPlanner({mode='demo',initialUser=null,loginName='',
       <option value={number} key={number} label={number+' · '+flight.origin+' → '+flight.destination}/>)}</datalist>
   </label>;
   const fixed=(label,value)=><label className="block text-xs text-slate-600">{label}<input readOnly className={input+' mt-1 bg-slate-50'} value={value}/></label>;
-  const date=(label,key)=><DateField label={label} value={trip[key]} calendarReference={key==='checkout'?trip.checkin:''} onChange={v=>change(key,v)}/>;
+  const date=(label,key)=><DateField label={label} value={trip[key]} calendarReference={tripCalendarReference(trip,key)} onChange={v=>change(key,v)}/>;
   const time=(label,key)=><TimeField label={label} value={trip[key]} onChange={v=>change(key,v)}/>;
   const nights=nightsBetween(trip.checkin,trip.checkout);
   const eligiblePickupOptions=pickupOptions.filter(option=>{
