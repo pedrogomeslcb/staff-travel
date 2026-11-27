@@ -5,7 +5,7 @@ import {SCHEDULE_CATEGORIES,OFF_PROJECT_LABEL,display} from '../lib/planner.mjs'
 
 export const activityLabels={
   driver_created:'Driver added',driver_updated:'Driver details updated',
-  hotel_created:'Hotel request created',hotel_edited:'Hotel request edited',
+  hotel_deleted:'Canceled hotel request deleted',hotel_created:'Hotel request created',hotel_edited:'Hotel request edited',
   hotel_requested:'Marked requested from hotel',hotel_unrequested:'Requested flag cleared',
   hotel_confirmed:'Hotel confirmation saved',hotel_canceled:'Hotel cancellation requested',
   hotel_notified:'Hotel notification recorded',onsite_removed:'Onsite days removed',schedule_changed:'Schedule updated',
