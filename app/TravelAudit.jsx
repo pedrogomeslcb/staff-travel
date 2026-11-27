@@ -1,9 +1,10 @@
 'use client';
 
 import {useEffect,useState} from 'react';
-import {SCHEDULE_CATEGORIES,display} from '../lib/planner.mjs';
+import {SCHEDULE_CATEGORIES,OFF_PROJECT_LABEL,display} from '../lib/planner.mjs';
 
-const labels={
+export const activityLabels={
+  driver_created:'Driver added',driver_updated:'Driver details updated',
   hotel_created:'Hotel request created',hotel_edited:'Hotel request edited',
   hotel_requested:'Marked requested from hotel',hotel_unrequested:'Requested flag cleared',
   hotel_confirmed:'Hotel confirmation saved',hotel_canceled:'Hotel cancellation requested',
@@ -12,14 +13,14 @@ const labels={
   user_deleted:'User account removed',membership_updated:'IHG membership updated',hotel_updated:'Hotel request updated',
 };
 const statusLabels=new Map(SCHEDULE_CATEGORIES.map(([id,label])=>[id,label]));
-const status=value=>statusLabels.get(value)||'No entry';
+const status=value=>statusLabels.get(value)||OFF_PROJECT_LABEL;
 const dateTime=new Intl.DateTimeFormat('en-GB',{dateStyle:'short',timeStyle:'medium',hourCycle:'h23'});
 const stamp=value=>dateTime.format(new Date(value));
 const fieldValue=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)?display(value):value||'Empty';
 
 export default function TravelAudit({repo,user,trips,shared,connected=false}) {
   const [events,setEvents]=useState([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
-  const [personId,setPersonId]=useState(''),[limit,setLimit]=useState(30),[reload,setReload]=useState(0);
+  const [personId,setPersonId]=useState(''),[eventType,setEventType]=useState('all'),[limit,setLimit]=useState(30),[reload,setReload]=useState(0);
   useEffect(()=>{
     let active=true;
     setLoading(true);setError('');
@@ -34,7 +35,7 @@ export default function TravelAudit({repo,user,trips,shared,connected=false}) {
     if(!people.has(event.personId))people.set(event.personId,event.personName);
     if(!people.has(event.actorId))people.set(event.actorId,event.actorName);
   }
-  const filtered=events.filter(event=>!personId||event.personId===personId||event.actorId===personId);
+  const filtered=events.filter(event=>(!personId||event.personId===personId||event.actorId===personId)&&(eventType==='all'||event.kind===eventType));
   return <section className="space-y-4 rounded-xl border bg-white p-5">
     <div className="flex flex-wrap justify-between gap-3">
       <div><h2 className="font-semibold text-slate-900">{connected?'Activity logs':'Travel audit log'}</h2>
@@ -42,20 +43,20 @@ export default function TravelAudit({repo,user,trips,shared,connected=false}) {
       </div>
       <button type="button" disabled={loading} className="self-start rounded-lg border px-3 py-2 text-sm text-blue-700" onClick={()=>setReload(value=>value+1)}>Refresh</button>
     </div>
-    <label className="block max-w-xs text-xs text-slate-600">Person involved
+    <div className="grid gap-3 sm:grid-cols-2"><label className="block text-xs text-slate-600">Person involved
       <select className="mt-1 w-full rounded-lg border bg-white px-2.5 py-2 text-sm text-slate-800" value={personId}
         onChange={event=>{setPersonId(event.target.value);setLimit(30);}}>
         <option value="">Everyone</option>
         {[...people].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=><option key={id} value={id}>{name}</option>)}
       </select>
-    </label>
+    </label><label className="block text-xs text-slate-600">Activity type<select className="mt-1 w-full rounded-lg border bg-white px-2.5 py-2 text-sm text-slate-800" value={eventType} onChange={e=>{setEventType(e.target.value);setLimit(30);}}><option value="all">All activity</option>{[...new Set(events.map(e=>e.kind))].sort((a,b)=>(activityLabels[a]||a).localeCompare(activityLabels[b]||b)).map(kind=><option key={kind} value={kind}>{activityLabels[kind]||kind}</option>)}</select></label></div>
     {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
     {loading&&<p role="status" className="text-sm text-slate-600">Loading activity…</p>}
     {!loading&&!error&&!filtered.length&&<p className="text-sm text-slate-600">No activity matches this view.</p>}
     <ol className="divide-y border-y">
       {filtered.slice(0,limit).map(event=><li key={event.id} className="space-y-2 py-3 text-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 className="font-semibold text-slate-900">{labels[event.kind]||event.kind}</h3>
+          <h3 className="font-semibold text-slate-900">{activityLabels[event.kind]||event.kind}</h3>
           <time className="text-xs text-slate-600" dateTime={event.at}>{stamp(event.at)}</time>
         </div>
         <p className="text-xs text-slate-600">By <strong>{event.actorName}</strong> · Team member <strong>{event.personName}</strong></p>
