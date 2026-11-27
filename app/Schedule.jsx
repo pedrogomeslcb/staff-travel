@@ -346,7 +346,7 @@ export default function Schedule({countryTrips,countryLimited,month,setMonth,peo
               data-schedule-source={entry?.source||''}
               data-schedule-status={entry?.status||''}
               data-editable-date={editable?date:undefined}
-              className={'block mx-auto rounded h-6 w-[calc(100%_-_4px)] max-w-8 text-[10px] font-semibold select-none '+(category?'text-white':selected?'text-blue-700':'text-slate-400')}
+              className={'block mx-auto rounded h-9 sm:h-6 w-[calc(100%_-_4px)] max-w-8 text-[10px] font-semibold select-none '+(category?'text-white':selected?'text-blue-700':'text-slate-400')}
               style={{backgroundColor:weekend?WEEKEND_COLOR:category?.[2]||(selected||isToday?'transparent':'#FFFFFF'),opacity:category&&!categories.includes(category[0])?0.2:1,cursor:editable?undefined:'default'}}
               onMouseDown={event=>{
                 if (!canEdit||event.button!==0) return;

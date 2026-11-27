@@ -28,16 +28,16 @@ export default function Overview({user,people,trips,countryTrips,countryLimited,
   const mine=trips.filter(t=>t.userId===user.id).sort((a,b)=>(a.outDate||a.checkin||'').localeCompare(b.outDate||b.checkin||''));
   const upcoming=mine.filter(t=>!t.canceledAt&&!t.archivedAt&&(t.returnDate||t.checkout||'')>=today);
   const past=mine.filter(t=>!upcoming.includes(t)).reverse();
-  const total=countryYearBreakdown(countryTrips,user.id,year,today);
+  const total=countryYearBreakdown(mine,user.id,year,today);
   const scheduleLabel=SCHEDULE_CATEGORIES.find(c=>c[0]===resolveScheduleDay(schedule,presence,user.id,today)?.status)?.[1]||'No entry';
-  const onsite=people.filter(p=>!p.isPrimaryAdmin&&['onsite','onsite-half'].includes(resolveScheduleDay(schedule,presence,p.id,today)?.status));
-  const groups=useMemo(()=>buildTransferPlan(transferTrips,{period:'all',allocations,drivers}).days.flatMap(d=>d.groups),[transferTrips,allocations,drivers]);
+  const onsite=people.filter(p=>!p.deletedAt&&!p.isPrimaryAdmin&&['onsite','onsite-half'].includes(resolveScheduleDay(schedule,presence,p.id,today)?.status));
+  const groups=useMemo(()=>buildTransferPlan(transferTrips,{period:'all',allocations,drivers:drivers??[]}).days.flatMap(d=>d.groups),[transferTrips,allocations,drivers]);
   const copy=async value=>{try{await navigator.clipboard.writeText(value);setCopied('Confirmation number copied.');}catch{setCopied('Could not copy. Select the confirmation number to copy manually.');}};
   const tripCard=t=><article key={t.id} className="rounded-xl border bg-white p-4 space-y-3">
     <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">{t.outDestination||'Trip'} · {display(t.outDate||t.checkin)} – {display(t.returnDate||t.checkout)}</h3><p className="text-xs text-slate-600">Hotel: {display(t.checkin)} – {display(t.checkout)}</p></div><Status value={hotelStatus(t)}/></div>
     {!t.archivedAt&&!t.canceledAt&&<><p className="text-sm break-words">Flights: {t.outFlight} / {t.returnFlight}</p>
       {t.confirmationNumber&&<div className="flex flex-wrap items-center gap-2 text-sm"><span className="break-all">Confirmation: {t.confirmationNumber}</span><button type="button" className={secondary} onClick={()=>copy(t.confirmationNumber)}>Copy</button></div>}
-      {['arrival','return'].map(leg=>{const group=groups.find(g=>g.entries.some(e=>e.trip.id===t.id&&e.leg===leg));const entry=group?.entries.find(e=>e.trip.id===t.id&&e.leg===leg);return <div key={leg} className="flex flex-wrap justify-between gap-2 border-t pt-2 text-sm"><div><p className="font-medium">{leg==='arrival'?'Airport to hotel':'Hotel to airport'}</p><p className="text-xs text-slate-600">{display(group?.date|| (leg==='arrival'?t.outDate:t.pickupDate))} · {group?.time||(leg==='arrival'?t.outTime:t.pickupTime)}</p></div><Status value={passengersReady?legStatus(entry):['Check Transfers','bg-slate-100 text-slate-700']}/></div>;})}
+      {['arrival','return'].map(leg=>{const group=groups.find(g=>g.entries.some(e=>e.trip.id===t.id&&e.leg===leg));const entry=group?.entries.find(e=>e.trip.id===t.id&&e.leg===leg);return <div key={leg} className="flex flex-wrap justify-between gap-2 border-t pt-2 text-sm"><div><p className="font-medium">{leg==='arrival'?'Airport to hotel':'Hotel to airport'}</p><p className="text-xs text-slate-600">{display(group?.date|| (leg==='arrival'?t.outDate:t.pickupDate))} · {group?.time||(leg==='arrival'?t.outTime:t.pickupTime)}</p></div><Status value={passengersReady&&drivers?legStatus(entry):['Check Transfers','bg-slate-100 text-slate-700']}/></div>;})}
       <div className="flex flex-wrap gap-2"><button type="button" className={secondary} disabled={busy} onClick={()=>onEdit(t)}>Edit trip</button><button type="button" className={secondary} onClick={()=>onNavigate('transport')}>Transfer details</button><button type="button" className={secondary} onClick={()=>onNavigate('travel')}>Hotel details</button></div></>}
   </article>;
   return <div className="space-y-5">

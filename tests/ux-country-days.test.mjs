@@ -19,3 +19,8 @@ test('flight first form prefills hotel dates without overwriting independent dat
   draft=changeTrip(draft,'outDate','06/12/2026');
   assert.equal(draft.checkin,'08/12/2026');
 });
+
+test('invalid reversed intervals never contribute to completed days',()=>{
+  const trips=[{userId:'a',outDate:'2026-11-25',returnDate:'invalid'},{userId:'a',outDate:'2026-11-25',returnDate:'2026-11-24'}];
+  assert.deepEqual(countryYearBreakdown(trips,'a',2026,'2026-11-27'),{completed:0,planned:0,total:0,remaining:90});
+});

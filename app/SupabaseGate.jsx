@@ -38,7 +38,7 @@ export default function SupabaseGate() {
   const [notice,setNotice]=useState('');
   const [password,setPassword]=useState('');
   const [showPassword,setShowPassword]=useState(false);
-  const [remember,setRemember]=useState(true);
+  const [remember,setRemember]=useState(()=>{try{return sessionStorage.getItem('staff-session-only')!=='1';}catch{return false;}});
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const loadIdentity=useCallback(async()=>{
@@ -116,7 +116,7 @@ export default function SupabaseGate() {
     setBusy(true);
     const {error:logoutError}=await supabase.auth.signOut();
     if(logoutError)setError(logoutError.message);
-    else {setIdentity(null);setPassword('');}
+    else {setIdentity(null);setPassword('');setShowPassword(false);}
     setBusy(false);
   }
   if(!supabase)return <div className="mx-auto mt-20 max-w-xl rounded-xl border bg-white p-8 text-sm text-red-800">
@@ -131,9 +131,9 @@ export default function SupabaseGate() {
       <h1 className="text-2xl font-semibold text-blue-900">Staff Planner</h1>
       <div className="grid grid-cols-2 rounded-lg border bg-slate-50 p-1 text-sm">
         <button type="button" className={view==='login'?'rounded-md bg-white p-2 font-semibold shadow-sm':'p-2 text-slate-600'}
-          onClick={()=>{setView('login');setError('');setNotice('');setPassword('');}}>Sign in</button>
+          onClick={()=>{setView('login');setError('');setNotice('');setPassword('');setConfirmPassword('');setShowPassword(false);}}>Sign in</button>
         <button type="button" className={view==='register'?'rounded-md bg-white p-2 font-semibold shadow-sm':'p-2 text-slate-600'}
-          onClick={()=>{setView('register');setError('');setNotice('');setPassword('');}}>Create account</button>
+          onClick={()=>{setView('register');setError('');setNotice('');setPassword('');setConfirmPassword('');setShowPassword(false);}}>Create account</button>
       </div>
       <p className="text-sm text-slate-600">{view==='register'
         ?'New team members can create their own login using the internal team access code. Accounts always start as User.'
