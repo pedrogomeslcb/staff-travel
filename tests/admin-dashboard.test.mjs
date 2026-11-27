@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildAdminDashboard} from '../lib/admin-dashboard.mjs';
+import {buildAdminDashboard,dashboardActions} from '../lib/admin-dashboard.mjs';
 import {driverIdentity} from '../lib/driver-catalog.mjs';
 import {DRIVERS} from '../lib/transfers.mjs';
 import {buildTransferPlan,transferSlot} from '../lib/transfer-plan.mjs';
@@ -34,4 +34,14 @@ test('driver rename keeps ID, capacity, existing group allocation and uses new c
 test('missing driver references are not presented as a valid empty transfer queue',()=>{
  const data=buildAdminDashboard({...base,trips:[makeTrip('a')],drivers:undefined,transferTrips:[makeTrip('a')]});
  assert.equal(data.transferReady,false);assert.equal(data.tasks.transfer.length,0);
+});
+
+test('action queue prioritizes unresolved past dates, today and missing dates before upcoming work',()=>{
+ const tasks={request:[{id:'future',date:'2027-01-20',name:'Future'},{id:'today',date:today,name:'Today'}],confirmation:[{id:'past',date:'2027-01-16',name:'Past'}],reconfirm:[],cancel:[],transfer:[{id:'unknown',date:'',name:'Unknown'},{id:'transfer',date:today,time:'08:00',name:'Transfer'}]};
+ assert.deepEqual(dashboardActions(tasks,today).map(r=>r.id),['past','today','transfer','unknown','future']);
+ assert.deepEqual(dashboardActions(tasks,today,'priority').map(r=>r.id),['past','today','transfer','unknown']);
+ assert.deepEqual(dashboardActions(tasks,today,'hotel').map(r=>r.id),['past','today','future']);
+ assert.deepEqual(dashboardActions(tasks,today,'transfer').map(r=>r.id),['transfer','unknown']);
+ assert.equal(dashboardActions(tasks,today).find(r=>r.id==='unknown').timing,'undated');
+ assert.equal(tasks.request[0].id,'future');
 });
